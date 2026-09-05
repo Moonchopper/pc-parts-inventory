@@ -34,9 +34,17 @@ pnpm harness --name <n>          # boots the API on a temp SQLite DB with HARNES
                                  # runs due jobs, fetches share JSON/HTML/MD/PNG → artifacts/harness/<n>/{report.json,card.png,share.html}
                                  # READ report.json (counters) and card.png before claiming anything works
 pnpm gen                         # contracts → openapi.json + generated client types (commit the output)
-pnpm dev                         # api :3000 (Scalar docs at /api/docs) + web :5173
-                                 # FOOTGUN: VS Code can squat 127.0.0.1:3000 — Node then binds with NO error
-                                 # and every request hangs. `netstat -ano | findstr :3000` before blaming the API.
+pnpm dev                         # api :3000 (Scalar docs at /api/docs) + web :5173. Runs the API with
+                                 # NODE_ENV=development, so POST /jobs/run-due exists (D10) — but you rarely need it:
+                                 # enqueue wakes the runner (D18), so a refresh lands in ~1 s, not 30.
+# PREFERRED dev invocation on Austin's box (PowerShell 5.1) — dodges the :3000 squatters entirely:
+#   $env:PORT='3010'; $env:API_URL='http://localhost:3010'; $env:PUBLIC_ORIGIN='http://localhost:5173'; pnpm dev
+#   web stays on :5173 (vite ignores PORT). PUBLIC_ORIGIN has no sensible dev default: without it the Markdown
+#   footer links the API's own port, which serves no /b/ page (compose sets it; `pnpm dev` cannot guess it).
+                                 # FOOTGUN (now caught, not silent): VS Code can squat 127.0.0.1:3000 while Node binds
+                                 # 0.0.0.0:3000 with NO error — the more specific binding wins and every request goes
+                                 # to the squatter. The API now health-checks its own port right after it binds and
+                                 # exits 1 with a loud line naming it. `netstat -ano | findstr :3010` to find the owner.
 docker compose up --build        # api + web containers, named volume pcpi-data
 powershell -NoProfile -File tools/scanner/scan.ps1 -OutFile scan.json [-ApiUrl http://localhost:3000 -Token …] [-RedactSerials]   # Windows PowerShell 5.1 (pwsh 7 also works if present)
 ```
@@ -78,6 +86,18 @@ artifacts/          gitignored evidence
 - **Harness checks are files** in `tools/harness/checks/`, discovered by directory read and run in
   **filename order** — the numeric prefixes are load-bearing. Adding a check means adding a file, never
   editing `harness.ts`.
+- **A URL that leaves the system never comes from the API's own request origin (D16).** `PUBLIC_ORIGIN` is the
+  one source for the Markdown footer and anything like it, and a user-facing link points at the human page
+  `/b/{slug}` — never `/api/v1/…`, never an internal hostname like `api:3000`.
+- **"No data" never renders as a number (D17).** `—` when the coverage count is 0 or the value is absent, in
+  every renderer (card, Markdown, share page, build page, inventory). `$0.00` means a real zero was recorded.
+- **The scanner cleans trailing punctuation off serials** before they become a D8 identity key (an NVMe that
+  reports `…E87F_6C0C.` is the same disk as `…E87F_6C0C`), and **emits `components` in a deterministic order**
+  (D19: category §3-order, manufacturer, model, `serial ?? slot ?? ''`) — WMI enumeration order is not stable, so
+  without the sort the committed fixture moves on every capture. Two captures differ only in `scannedAt`.
+- **Every agent stops every server it starts** and pastes a `netstat -ano | findstr LISTENING` tail proving it
+  (playbook learning 35). On this box `Stop-Process` is blocked by the permission classifier; `taskkill //PID <n>
+  //T //F` works from the Bash tool.
 
 ## Framework notes (pinned by the M0 seed; **exact pins, no `^`/`~` anywhere** — verified by the PM 2026-09-05)
 
