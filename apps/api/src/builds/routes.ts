@@ -7,19 +7,19 @@ import {
   BuildItemCreate,
   BuildItemExpanded as BuildItemExpandedSchema,
   BuildPatch,
+  compareByCategoryOrder,
   Valuation,
 } from '@pcpi/contracts';
-import type { ValuateItemInput, ValuateQuoteInput } from '@pcpi/core';
-import { valuate } from '@pcpi/core';
 import { and, eq } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { requireAuth } from '../auth.js';
 import { getDb } from '../db/client.js';
-import { buildItems, builds, parts, priceQuotes, products } from '../db/schema.js';
+import { buildItems, builds, parts, products } from '../db/schema.js';
 import { LOCAL_OWNER_ID } from '../db/seed.js';
 import { toBuildDTO, toPartDTO, toProductDTO } from '../dto.js';
 import { generateId, generateSlug } from '../ids.js';
 import { validationHook } from '../openapi-hook.js';
+import { computeValuation } from './valuation.js';
 
 export const routes = new OpenAPIHono({ defaultHook: validationHook });
 
@@ -49,6 +49,16 @@ function notFoundBuild(id: string): ApiError {
   return { error: { code: 'not_found', message: `Build ${id} not found` } };
 }
 
+/** Task 3 (architect-directed, 2026-09-05) — category, then manufacturer, then model, then quantity
+ * descending, sorted once here so the JSON, web page, Markdown and PNG never disagree with each
+ * other or with themselves across runs. */
+const orderBuildItems = compareByCategoryOrder<BuildItemExpanded>((item) => ({
+  category: item.product.category,
+  manufacturer: item.product.manufacturer,
+  model: item.product.model,
+  quantity: item.part.quantity,
+}));
+
 function loadItems(buildId: string): BuildItemExpanded[] {
   const rows = getDb()
     .select({ item: buildItems, part: parts, product: products })
@@ -58,7 +68,7 @@ function loadItems(buildId: string): BuildItemExpanded[] {
     .where(eq(buildItems.buildId, buildId))
     .all();
 
-  return rows.map(({ item, part, product }) => ({
+  const items = rows.map(({ item, part, product }) => ({
     buildId: item.buildId,
     partId: item.partId,
     ...(item.slot != null ? { slot: item.slot } : {}),
@@ -66,6 +76,8 @@ function loadItems(buildId: string): BuildItemExpanded[] {
     part: toPartDTO(part),
     product: toProductDTO(product),
   }));
+
+  return items.sort(orderBuildItems);
 }
 
 routes.openapi(
@@ -367,22 +379,6 @@ routes.openapi(
   },
 );
 
-/** D5 — every quote ever recorded for this product, oldest-first-irrelevant: `valuate()` itself picks the precedence winner and the latest-within-kind. */
-function loadQuotesForProduct(productId: string): ValuateQuoteInput[] {
-  return getDb()
-    .select()
-    .from(priceQuotes)
-    .where(eq(priceQuotes.productId, productId))
-    .all()
-    .map((q) => ({
-      kind: q.kind,
-      priceCents: q.priceCents,
-      currency: q.currency,
-      observedAt: q.observedAt,
-      provider: q.provider,
-    }));
-}
-
 routes.openapi(
   createRoute({
     method: 'get',
@@ -401,21 +397,7 @@ routes.openapi(
     const build = loadBuild(id);
     if (!build) return c.json(notFoundBuild(id), 404);
 
-    const rows = getDb()
-      .select({ part: parts, product: products })
-      .from(buildItems)
-      .innerJoin(parts, eq(buildItems.partId, parts.id))
-      .innerJoin(products, eq(parts.productId, products.id))
-      .where(eq(buildItems.buildId, id))
-      .all();
-
-    const items: ValuateItemInput[] = rows.map(({ part, product }) => ({
-      partId: part.id,
-      acquiredCents: part.acquiredPriceCents,
-      quotes: loadQuotesForProduct(product.id),
-    }));
-
-    const valuation = valuate({ buildId: id, currency: 'USD', items });
+    const valuation = computeValuation(id, build.ownerId);
     return c.json(valuation, 200);
   },
 );

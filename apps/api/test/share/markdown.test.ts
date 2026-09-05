@@ -1,4 +1,9 @@
-import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
+import type {
+  SharedBuild,
+  SharedBuildItem,
+  ValuationComparable,
+  ValuationCoverage,
+} from '@pcpi/contracts';
 import { describe, expect, it } from 'vitest';
 import { renderShareMarkdown } from '../../src/share/markdown.js';
 
@@ -18,9 +23,25 @@ function build(overrides: Partial<SharedBuild> = {}): SharedBuild {
     slug: 'abc123defg',
     name: 'MOONPC',
     updatedAt: '2026-09-01T00:00:00.000Z',
+    currency: 'USD',
     items: [item()],
     ...overrides,
   };
+}
+
+function comparable(overrides: Partial<ValuationComparable> = {}): ValuationComparable {
+  return {
+    items: 1,
+    acquiredCents: 0,
+    currentCents: 0,
+    deltaCents: 0,
+    deltaPct: null,
+    ...overrides,
+  };
+}
+
+function coverage(overrides: Partial<ValuationCoverage> = {}): ValuationCoverage {
+  return { items: 1, withAcquired: 1, withCurrent: 1, ...overrides };
 }
 
 function countDataRows(md: string): number {
@@ -94,6 +115,109 @@ describe('renderShareMarkdown — structure', () => {
   });
 });
 
+describe('renderShareMarkdown — currency (Task 1/2, architect 2026-09-05)', () => {
+  it('formats item prices and totals with a non-USD currency, never a hardcoded $', () => {
+    const md = renderShareMarkdown(
+      build({
+        currency: 'EUR',
+        items: [item({ currentCents: 123456 })],
+        valuation: {
+          acquiredCents: 100000,
+          currentCents: 123456,
+          comparable: comparable({
+            acquiredCents: 100000,
+            currentCents: 123456,
+            deltaCents: 23456,
+            deltaPct: 23.5,
+          }),
+          coverage: coverage(),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('€1,234.56');
+    expect(md).not.toContain('$');
+  });
+});
+
+describe('renderShareMarkdown — Paid/Now/Δ totals (Task 7 presentation)', () => {
+  it('omits totals rows entirely when valuation is absent', () => {
+    const md = renderShareMarkdown(build(), 'https://example.test');
+    expect(md).not.toContain('**Paid**');
+    expect(md).not.toContain('**Now**');
+    expect(md).not.toContain('**Δ**');
+  });
+
+  it('renders Paid, Now, a signed Δ and an "n of m priced" caption when valuation is present', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 175000,
+          currentCents: 189998,
+          comparable: comparable({
+            items: 2,
+            acquiredCents: 175000,
+            currentCents: 189998,
+            deltaCents: 14998,
+            deltaPct: 8.6,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 2, withCurrent: 2 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('| **Paid** | | **$1,750.00** |');
+    expect(md).toContain('| **Now** | | **$1,899.98** |');
+    expect(md).toContain('+$149.98 (+8.6%)');
+    expect(md).toContain('*2 of 3 priced*');
+  });
+
+  it('signs a negative delta with a minus and no fake percent when comparable.acquiredCents is 0', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 0,
+          currentCents: 0,
+          comparable: comparable({
+            items: 1,
+            acquiredCents: 0,
+            currentCents: -500,
+            deltaCents: -500,
+            deltaPct: null,
+          }),
+          coverage: coverage(),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('-$5.00');
+    expect(md).not.toContain('NaN');
+    expect(md).not.toContain('Infinity');
+  });
+
+  it('renders Δ as an em dash — never 0 or +0.0% — when comparable.items is 0 (no comparable items != no change)', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 0,
+          currentCents: 6000,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ withAcquired: 0, withCurrent: 1 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('| **Δ** | | **—** |');
+    expect(md).not.toContain('+0.0%');
+  });
+});
+
 describe('renderShareMarkdown — `|` and newline escaping', () => {
   it('escapes a pipe in an item name so it cannot split the table row', () => {
     const md = renderShareMarkdown(
@@ -121,35 +245,6 @@ describe('renderShareMarkdown — `|` and newline escaping', () => {
   it('escapes a pipe in the build name (H1)', () => {
     const md = renderShareMarkdown(build({ name: 'My | Build' }), 'https://example.test');
     expect(md.startsWith('# My \\| Build')).toBe(true);
-  });
-});
-
-describe('renderShareMarkdown — totals (present/absent with and without valuation)', () => {
-  it('omits totals rows entirely when valuation is absent', () => {
-    const md = renderShareMarkdown(build(), 'https://example.test');
-    expect(md).not.toContain('Total (current)');
-    expect(md).not.toContain('Total (paid)');
-    expect(md).not.toContain('Delta');
-  });
-
-  it('renders Total (current), Total (paid) and a signed Delta when valuation is present', () => {
-    const md = renderShareMarkdown(
-      build({ valuation: { acquiredCents: 175000, currentCents: 189998, deltaCents: 14998 } }),
-      'https://example.test',
-    );
-    expect(md).toContain('| **Total (current)** | | **$1,899.98** |');
-    expect(md).toContain('| **Total (paid)** | | **$1,750.00** |');
-    expect(md).toContain('+$149.98 (+8.6%)');
-  });
-
-  it('signs a negative delta with a minus and no fake percent when acquired is 0', () => {
-    const md = renderShareMarkdown(
-      build({ valuation: { acquiredCents: 0, currentCents: 0, deltaCents: -500 } }),
-      'https://example.test',
-    );
-    expect(md).toContain('-$5.00');
-    expect(md).not.toContain('NaN');
-    expect(md).not.toContain('Infinity');
   });
 });
 

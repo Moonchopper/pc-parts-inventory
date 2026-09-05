@@ -1,18 +1,31 @@
 import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
 import { categoryLabel } from './category-labels.js';
 import { itemDisplayName } from './item-name.js';
-import { deltaPercent, formatCents, formatSignedCents, formatSignedPercent } from './money.js';
+import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
 import { escapeMarkdownCell } from './text.js';
 
-function itemPriceCell(item: SharedBuildItem): string {
-  return item.currentCents != null ? formatCents(item.currentCents) : '—';
+function itemPriceCell(item: SharedBuildItem, currency: string): string {
+  return item.currentCents != null ? formatCents(item.currentCents, currency) : '—';
+}
+
+/** `—` when there is nothing comparable to delta (Task 7: "no comparable items" and "no change"
+ * are different facts — never render `0`/`+0.0%` for the former). */
+function deltaCell(valuation: NonNullable<SharedBuild['valuation']>, currency: string): string {
+  const { comparable } = valuation;
+  if (comparable.items === 0) return '—';
+  return comparable.deltaPct != null
+    ? `${formatSignedCents(comparable.deltaCents, currency)} (${formatSignedPercent(comparable.deltaPct)})`
+    : formatSignedCents(comparable.deltaCents, currency);
 }
 
 /**
  * PCPartPicker-style Markdown table (deliverable 1). Exactly one row per `build.items` entry —
  * the §7 integration gate asserts `share.md.rows == items`. Totals rows are omitted entirely when
- * `build.valuation` is absent (W0.3 may not exist on this branch) rather than showing a fake
- * "$0.00" or "NaN".
+ * `build.valuation` is absent rather than showing a fake "$0.00" or "NaN".
+ *
+ * Presentation (Task 7, architect): Paid / Now / Δ, with a "n of m priced" caption from `coverage`
+ * — replaces the old "Total (current)/Total (paid)/Delta" rows, which read the flat
+ * `deltaCents`/`deltaPct` the revised `Valuation` contract no longer carries at the top level.
  */
 export function renderShareMarkdown(build: SharedBuild, shareUrl: string): string {
   const lines: string[] = [];
@@ -24,19 +37,16 @@ export function renderShareMarkdown(build: SharedBuild, shareUrl: string): strin
   for (const item of build.items) {
     const type = escapeMarkdownCell(categoryLabel(item.category));
     const name = escapeMarkdownCell(itemDisplayName(item));
-    lines.push(`| ${type} | ${name} | ${itemPriceCell(item)} |`);
+    lines.push(`| ${type} | ${name} | ${itemPriceCell(item, build.currency)} |`);
   }
 
   if (build.valuation) {
-    const { acquiredCents, currentCents, deltaCents } = build.valuation;
-    const pct = deltaPercent(acquiredCents, deltaCents);
-    const deltaCell =
-      pct != null
-        ? `${formatSignedCents(deltaCents)} (${formatSignedPercent(pct)})`
-        : formatSignedCents(deltaCents);
-    lines.push(`| **Total (current)** | | **${formatCents(currentCents)}** |`);
-    lines.push(`| **Total (paid)** | | **${formatCents(acquiredCents)}** |`);
-    lines.push(`| **Delta** | | **${deltaCell}** |`);
+    const { acquiredCents, currentCents, coverage } = build.valuation;
+    lines.push(`| **Paid** | | **${formatCents(acquiredCents, build.currency)}** |`);
+    lines.push(`| **Now** | | **${formatCents(currentCents, build.currency)}** |`);
+    lines.push(`| **Δ** | | **${deltaCell(build.valuation, build.currency)}** |`);
+    lines.push('');
+    lines.push(`*${coverage.withCurrent} of ${coverage.items} priced*`);
   }
 
   lines.push('');

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ApiError, ScanPayload } from '../src/index.js';
+import { ApiError, ScanPayload, SharedBuild } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, '../fixtures/scan.sample.json');
@@ -50,5 +50,36 @@ describe('ApiError', () => {
 
   it('rejects a response missing the error envelope', () => {
     expect(ApiError.safeParse({ code: 'not_found', message: 'nope' }).success).toBe(false);
+  });
+});
+
+describe('SharedBuild — currency (architect, 2026-09-05)', () => {
+  function validSharedBuild(overrides: Record<string, unknown> = {}) {
+    return {
+      slug: 'abc123defg',
+      name: 'MOONPC',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+      currency: 'USD',
+      items: [],
+      ...overrides,
+    };
+  }
+
+  it('accepts a payload with a currency string', () => {
+    expect(SharedBuild.safeParse(validSharedBuild()).success).toBe(true);
+  });
+
+  it('rejects a payload with no currency at all — a required field, not an optional one', () => {
+    const { currency: _currency, ...withoutCurrency } = validSharedBuild();
+    const result = SharedBuild.safeParse(withoutCurrency);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty-string currency', () => {
+    expect(SharedBuild.safeParse(validSharedBuild({ currency: '' })).success).toBe(false);
+  });
+
+  it('accepts a non-USD ISO-4217 currency (no per-currency special-casing in the schema)', () => {
+    expect(SharedBuild.safeParse(validSharedBuild({ currency: 'EUR' })).success).toBe(true);
   });
 });

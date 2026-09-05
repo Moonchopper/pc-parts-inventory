@@ -120,3 +120,17 @@ export async function removeBuildItem(buildId: string, partId: string): Promise<
   );
   if (!res.ok) await throwFromResponse(res);
 }
+
+/**
+ * `PATCH /parts/{id}` (§5, `m0-crud-endpoints`) — Task 5.2: the inline "acquired price" edit on
+ * the inventory row. Integer minor units on the wire (D6) — the caller is responsible for never
+ * sending a float.
+ */
+export async function patchPart(id: string, patch: { acquiredPriceCents: number }): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/parts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) await throwFromResponse(res);
+}

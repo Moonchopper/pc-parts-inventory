@@ -45,7 +45,12 @@ export const actions: Actions = {
     try {
       await addBuildItem(params.id, partId, typeof slot === 'string' && slot ? slot : undefined);
     } catch (err) {
-      return fail(502, { message: messageFor(err, 'Failed to add part to build.') });
+      // Task 5.1 (2026-09-05 polish brief): surface the real upstream status — in particular the
+      // 409 "part already in another build" conflict — rather than a blanket 502, which reads as
+      // a server outage instead of "you can't do that, here's why" (the message was already
+      // readable via `messageFor`; only the status code was wrong).
+      const status = err instanceof ApiRequestError ? err.status : 502;
+      return fail(status, { message: messageFor(err, 'Failed to add part to build.') });
     }
     return { success: true };
   },
@@ -59,7 +64,8 @@ export const actions: Actions = {
     try {
       await removeBuildItem(params.id, partId);
     } catch (err) {
-      return fail(502, { message: messageFor(err, 'Failed to remove part from build.') });
+      const status = err instanceof ApiRequestError ? err.status : 502;
+      return fail(status, { message: messageFor(err, 'Failed to remove part from build.') });
     }
     return { success: true };
   },

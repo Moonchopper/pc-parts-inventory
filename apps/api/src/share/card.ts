@@ -4,7 +4,7 @@ import satori from 'satori';
 import { categoryLabel } from './category-labels.js';
 import { loadCardFonts } from './fonts.js';
 import { itemDisplayName } from './item-name.js';
-import { deltaPercent, formatCents, formatSignedCents, formatSignedPercent } from './money.js';
+import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
 import { truncate } from './text.js';
 
 export const CARD_WIDTH = 1200;
@@ -63,7 +63,7 @@ function categoryBadge(category: SharedBuildItem['category']): CardNode {
   );
 }
 
-function itemRow(item: SharedBuildItem): CardNode {
+function itemRow(item: SharedBuildItem, currency: string): CardNode {
   return div(
     {
       display: 'flex',
@@ -81,7 +81,7 @@ function itemRow(item: SharedBuildItem): CardNode {
           color: COLOR_TEXT,
         }),
       ]),
-      text(item.currentCents != null ? formatCents(item.currentCents) : '—', {
+      text(item.currentCents != null ? formatCents(item.currentCents, currency) : '—', {
         fontSize: 22,
         fontWeight: 400,
         color: COLOR_MUTED,
@@ -90,6 +90,12 @@ function itemRow(item: SharedBuildItem): CardNode {
   );
 }
 
+/**
+ * Task 7 presentation rule: Paid / Now / Δ with a "n of m priced" caption from `coverage`. Δ
+ * renders `—` (never `0`/`+0.0%`) when `comparable.items === 0` — "no comparable items" and "no
+ * change" are different facts, and conflating them was the original fallback bug in another
+ * costume.
+ */
 function valuationSummary(build: SharedBuild): CardNode {
   if (!build.valuation) {
     return text('Valuation not available yet', {
@@ -99,23 +105,45 @@ function valuationSummary(build: SharedBuild): CardNode {
     });
   }
 
-  const { acquiredCents, currentCents, deltaCents } = build.valuation;
-  const pct = deltaPercent(acquiredCents, deltaCents);
-  const deltaColor = deltaCents > 0 ? COLOR_UP : deltaCents < 0 ? COLOR_DOWN : COLOR_MUTED;
-  const deltaText =
-    pct != null
-      ? `${formatSignedCents(deltaCents)} (${formatSignedPercent(pct)})`
-      : formatSignedCents(deltaCents);
+  const { acquiredCents, currentCents, comparable, coverage } = build.valuation;
+  const hasComparable = comparable.items > 0;
+  const deltaColor = !hasComparable
+    ? COLOR_MUTED
+    : comparable.deltaCents > 0
+      ? COLOR_UP
+      : comparable.deltaCents < 0
+        ? COLOR_DOWN
+        : COLOR_MUTED;
+  const deltaText = !hasComparable
+    ? '—'
+    : comparable.deltaPct != null
+      ? `${formatSignedCents(comparable.deltaCents, build.currency)} (${formatSignedPercent(comparable.deltaPct)})`
+      : formatSignedCents(comparable.deltaCents, build.currency);
 
-  return div({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16 }, [
-    text(`Paid ${formatCents(acquiredCents)}`, {
-      fontSize: 22,
+  return div({ display: 'flex', flexDirection: 'column', gap: 6 }, [
+    div({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16 }, [
+      text(`Paid ${formatCents(acquiredCents, build.currency)}`, {
+        fontSize: 22,
+        fontWeight: 400,
+        color: COLOR_MUTED,
+      }),
+      // Plain middle dot, not an arrow glyph (`→`, U+2192): the embedded Inter subset
+      // (`apps/api/assets`) has no glyph for it, and satori/resvg render the gap as a tofu box
+      // instead of failing loudly — invisible until this brief actually populated `valuation` for
+      // the first time. `·` is already proven safe elsewhere on this card ("Shared build · slug").
+      text('·', { fontSize: 22, fontWeight: 400, color: COLOR_FAINT }),
+      text(`Now ${formatCents(currentCents, build.currency)}`, {
+        fontSize: 22,
+        fontWeight: 700,
+        color: COLOR_TEXT,
+      }),
+      text(deltaText, { fontSize: 22, fontWeight: 700, color: deltaColor }),
+    ]),
+    text(`${coverage.withCurrent} of ${coverage.items} priced`, {
+      fontSize: 14,
       fontWeight: 400,
-      color: COLOR_MUTED,
+      color: COLOR_FAINT,
     }),
-    text('→', { fontSize: 22, fontWeight: 400, color: COLOR_FAINT }),
-    text(`Now ${formatCents(currentCents)}`, { fontSize: 22, fontWeight: 700, color: COLOR_TEXT }),
-    text(deltaText, { fontSize: 22, fontWeight: 700, color: deltaColor }),
   ]);
 }
 
@@ -140,7 +168,7 @@ export function buildCardTree(build: SharedBuild): CardNode {
       paddingBottom: 8,
     },
     [
-      ...items.map(itemRow),
+      ...items.map((item) => itemRow(item, build.currency)),
       ...(overflow > 0
         ? [text(`+${overflow} more`, { fontSize: 20, fontWeight: 400, color: COLOR_FAINT })]
         : []),

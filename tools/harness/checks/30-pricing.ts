@@ -7,8 +7,10 @@ import type { HarnessCheck, Json } from '../types.js';
  * enqueues a `price_refresh` job per imported product, runs the job loop once via
  * `POST /jobs/run-due` (HARNESS=1, so that endpoint exists), and asserts D11/D5 outcomes:
  * `quotesRecorded >= 1` per fixture-matched product and `>= 2` overall, plus a `GET
- * /builds/{buildId}/valuation` with `currentCents > 0` and `deltaCents === currentCents -
- * acquiredCents`. `packages/core/fixtures/quotes.json` is authored to match products from both
+ * /builds/{buildId}/valuation` with `currentCents > 0` and (Task 7, architect 2026-09-05, revised
+ * `Valuation` contract) `comparable.deltaCents === comparable.currentCents - comparable.acquiredCents`
+ * — that identity holds only inside `comparable`, never at the top level, since the top-level sums
+ * are over different item sets. `packages/core/fixtures/quotes.json` is authored to match products from both
  * `packages/contracts/fixtures/scan.sample.json` (the default fixture this harness run imports)
  * and the real `tools/scanner/fixtures/MOONPC.redacted.json` scan (for the PM's `--fixture` run and
  * the §7 integration gate), so this check passes regardless of which one produced `ctx.fixture`.
@@ -78,20 +80,27 @@ export default {
     const valuation: Json = await valuationRes.json();
     ctx.counters.valuation.acquiredCents = valuation.acquiredCents ?? 0;
     ctx.counters.valuation.currentCents = valuation.currentCents ?? 0;
-    ctx.counters.valuation.deltaCents = valuation.deltaCents ?? 0;
+    ctx.counters.valuation.deltaCents = valuation.comparable?.deltaCents ?? 0;
 
     if (!(valuation.currentCents > 0)) {
       ctx.fail(`valuation.currentCents=${valuation.currentCents}, expected > 0`);
     }
-    const expectedDelta = valuation.currentCents - valuation.acquiredCents;
-    if (valuation.deltaCents !== expectedDelta) {
+    // Task 7 (architect, 2026-09-05): the identity holds only *inside* `comparable` — the
+    // top-level `acquiredCents`/`currentCents` are sums over different (possibly non-overlapping)
+    // item sets (no cost basis has been PATCHed onto anything yet at this point in the run, so
+    // `comparable` is typically still all-zero here; `35-cost-basis.ts` + `65-valuation-artifacts.ts`
+    // assert the *non-zero* delta from the share artifacts once a cost basis exists).
+    const expectedDelta = valuation.comparable.currentCents - valuation.comparable.acquiredCents;
+    if (valuation.comparable.deltaCents !== expectedDelta) {
       ctx.fail(
-        `valuation.deltaCents=${valuation.deltaCents}, expected ${expectedDelta} (currentCents - acquiredCents)`,
+        `valuation.comparable.deltaCents=${valuation.comparable.deltaCents}, expected ${expectedDelta} ` +
+          `(comparable.currentCents - comparable.acquiredCents)`,
       );
     }
 
     ctx.state.detail =
       `refreshed ${productList.length} products -> quotesRecorded=${totalQuotes} (${productsWithQuotes} matched the fixture provider); ` +
-      `valuation acquiredCents=${valuation.acquiredCents}, currentCents=${valuation.currentCents}, deltaCents=${valuation.deltaCents}`;
+      `valuation acquiredCents=${valuation.acquiredCents}, currentCents=${valuation.currentCents}, ` +
+      `comparable.deltaCents=${valuation.comparable.deltaCents}`;
   },
 } satisfies HarnessCheck;

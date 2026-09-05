@@ -135,3 +135,21 @@ describe('GET /api/v1/share/{slug} (JSON) — unaffected by the new routes', () 
     expect(body.items.length).toBeGreaterThan(0);
   });
 });
+
+describe('GET /api/v1/share/{slug} — currency (Task 1, architect 2026-09-05)', () => {
+  it('carries a non-empty ISO-4217 currency string', async () => {
+    const res = await app.request(`/api/v1/share/${slug}`);
+    const body = await res.json();
+    expect(typeof body.currency).toBe('string');
+    expect(body.currency.length).toBeGreaterThan(0);
+  });
+});
+
+describe('GET /api/v1/share/{slug} — deterministic item order (Task 3, architect 2026-09-05)', () => {
+  it('returns identical item arrays across two consecutive requests — deep-equal, not just same length', async () => {
+    const first = await (await app.request(`/api/v1/share/${slug}`)).json();
+    const second = await (await app.request(`/api/v1/share/${slug}`)).json();
+    expect(first.items.length).toBeGreaterThan(1);
+    expect(second.items).toEqual(first.items);
+  });
+});

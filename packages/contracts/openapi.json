@@ -630,11 +630,11 @@
           "currentCents": {
             "type": "integer"
           },
-          "deltaCents": {
-            "type": "integer"
+          "comparable": {
+            "$ref": "#/components/schemas/ValuationComparable"
           },
-          "deltaPct": {
-            "type": "number"
+          "coverage": {
+            "$ref": "#/components/schemas/ValuationCoverage"
           },
           "items": {
             "type": "array",
@@ -648,9 +648,58 @@
           "currency",
           "acquiredCents",
           "currentCents",
-          "deltaCents",
-          "deltaPct",
+          "comparable",
+          "coverage",
           "items"
+        ]
+      },
+      "ValuationComparable": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "integer"
+          },
+          "acquiredCents": {
+            "type": "integer"
+          },
+          "currentCents": {
+            "type": "integer"
+          },
+          "deltaCents": {
+            "type": "integer"
+          },
+          "deltaPct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "acquiredCents",
+          "currentCents",
+          "deltaCents",
+          "deltaPct"
+        ]
+      },
+      "ValuationCoverage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "integer"
+          },
+          "withAcquired": {
+            "type": "integer"
+          },
+          "withCurrent": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "withAcquired",
+          "withCurrent"
         ]
       },
       "ValuationItem": {
@@ -658,6 +707,9 @@
         "properties": {
           "partId": {
             "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
           },
           "acquiredCents": {
             "type": "integer"
@@ -690,7 +742,8 @@
           }
         },
         "required": [
-          "partId"
+          "partId",
+          "quantity"
         ]
       },
       "QuoteKind": {
@@ -939,6 +992,10 @@
           "updatedAt": {
             "type": "string"
           },
+          "currency": {
+            "type": "string",
+            "minLength": 1
+          },
           "items": {
             "type": "array",
             "items": {
@@ -954,14 +1011,18 @@
               "currentCents": {
                 "type": "integer"
               },
-              "deltaCents": {
-                "type": "integer"
+              "comparable": {
+                "$ref": "#/components/schemas/ValuationComparable"
+              },
+              "coverage": {
+                "$ref": "#/components/schemas/ValuationCoverage"
               }
             },
             "required": [
               "acquiredCents",
               "currentCents",
-              "deltaCents"
+              "comparable",
+              "coverage"
             ]
           }
         },
@@ -969,6 +1030,7 @@
           "slug",
           "name",
           "updatedAt",
+          "currency",
           "items"
         ]
       },
