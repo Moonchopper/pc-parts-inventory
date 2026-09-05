@@ -1,5 +1,10 @@
 import type { ValuationComparable, ValuationCoverage } from './domain.js';
 
+/** F12 — "1 part" / "2 parts": every count in this caption pluralizes its own noun independently. */
+function partsNoun(count: number): string {
+  return count === 1 ? 'part' : 'parts';
+}
+
 /**
  * The one wording for the "what does this valuation actually cover" line under Paid/Now/Δ —
  * architect-directed, 2026-09-05, presentation-only revision of the polish brief's Task 7 caption.
@@ -33,8 +38,8 @@ export function valuationCaption(v: {
   }
 
   if (comparable.items === 0) {
-    return `Now covers ${coverage.withCurrent} of ${coverage.items} parts · no part has both a cost basis and a price yet`;
+    return `Now covers ${coverage.withCurrent} of ${coverage.items} ${partsNoun(coverage.items)} · no part has both a cost basis and a price yet`;
   }
 
-  return `Now covers ${coverage.withCurrent} of ${coverage.items} parts · delta over the ${comparable.items} parts with both a cost basis and a price`;
+  return `Now covers ${coverage.withCurrent} of ${coverage.items} ${partsNoun(coverage.items)} · delta over the ${comparable.items} ${partsNoun(comparable.items)} with both a cost basis and a price`;
 }

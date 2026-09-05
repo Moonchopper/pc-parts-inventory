@@ -23,12 +23,16 @@
             "enum": [
               "sqlite"
             ]
+          },
+          "instanceId": {
+            "type": "string"
           }
         },
         "required": [
           "ok",
           "version",
-          "db"
+          "db",
+          "instanceId"
         ]
       },
       "Import": {

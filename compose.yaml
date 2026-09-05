@@ -15,6 +15,11 @@ services:
     environment:
       DATABASE_URL: file:/data/pcpi.db
       PORT: "3000"
+      # F10/D16: the API's own request origin inside this container is the Docker-internal
+      # `http://api:3000` — never a URL a person should see. PUBLIC_ORIGIN is the web service's
+      # public origin (same value as the `web` service's own ORIGIN below), the one source the
+      # Markdown share footer (and any future webhook/email) uses instead.
+      PUBLIC_ORIGIN: http://localhost:5173
     volumes:
       - pcpi-data:/data
     ports:

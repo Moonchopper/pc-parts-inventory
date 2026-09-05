@@ -16,7 +16,7 @@
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "dev": "tsx watch src/serve.ts",
+    "dev": "cross-env NODE_ENV=development tsx watch src/serve.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
+    "cross-env": "10.1.0",
     "drizzle-kit": "0.31.10"
   }
 }

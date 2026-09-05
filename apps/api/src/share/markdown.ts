@@ -1,7 +1,7 @@
 import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
 import { categoryLabel, valuationCaption } from '@pcpi/contracts';
 import { itemDisplayName } from './item-name.js';
-import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
+import { formatCents, formatSignedCents, formatSignedPercent, formatTotalOrDash } from './money.js';
 import { escapeMarkdownCell } from './text.js';
 
 function itemPriceCell(item: SharedBuildItem, currency: string): string {
@@ -46,9 +46,14 @@ export function renderShareMarkdown(build: SharedBuild, shareUrl: string): strin
   }
 
   if (build.valuation) {
-    const { acquiredCents, currentCents } = build.valuation;
-    lines.push(`| **Paid** | | **${formatCents(acquiredCents, build.currency)}** |`);
-    lines.push(`| **Now** | | **${formatCents(currentCents, build.currency)}** |`);
+    const { acquiredCents, currentCents, coverage } = build.valuation;
+    // F7/D17: `—` when nothing backs the number (`coverage.with*Cents === 0`), never a fake `$0.00`.
+    lines.push(
+      `| **Paid** | | **${formatTotalOrDash(acquiredCents, build.currency, coverage.withAcquired)}** |`,
+    );
+    lines.push(
+      `| **Now** | | **${formatTotalOrDash(currentCents, build.currency, coverage.withCurrent)}** |`,
+    );
     lines.push(`| **Δ** | | **${deltaCell(build.valuation, build.currency)}** |`);
     lines.push('');
     lines.push(`*${valuationCaption(build.valuation)}*`);

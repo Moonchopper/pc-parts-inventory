@@ -267,6 +267,97 @@ describe('renderShareMarkdown — Paid/Now/Δ totals (Task 7 presentation)', () 
   });
 });
 
+describe('renderShareMarkdown — D17 Paid/Now render "—" for no data, never $0.00 (F7)', () => {
+  it('Paid is — when coverage.withAcquired is 0; Now still renders a real figure', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 0,
+          currentCents: 5000,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 0, withCurrent: 1 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('| **Paid** | | **—** |');
+    expect(md).toContain('| **Now** | | **$50.00** |');
+  });
+
+  it('Now is — when coverage.withCurrent is 0; Paid still renders a real figure', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 5000,
+          currentCents: 0,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 1, withCurrent: 0 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('| **Now** | | **—** |');
+    expect(md).toContain('| **Paid** | | **$50.00** |');
+  });
+
+  it('both Paid and Now are — when neither has any coverage, and the caption still reads "No prices yet"', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 0,
+          currentCents: 0,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 0, withCurrent: 0 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('| **Paid** | | **—** |');
+    expect(md).toContain('| **Now** | | **—** |');
+    expect(md).toContain('*No prices yet · add a provider or refresh*');
+    expect(md).not.toContain('$0.00');
+  });
+
+  it('a real recorded 0 still renders $0.00 — coverage.withAcquired === 1 means a $0 cost basis was actually recorded', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 0,
+          currentCents: 5000,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 1, withCurrent: 1 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('| **Paid** | | **$0.00** |');
+  });
+});
+
 describe('renderShareMarkdown — `|` and newline escaping', () => {
   it('escapes a pipe in an item name so it cannot split the table row', () => {
     const md = renderShareMarkdown(

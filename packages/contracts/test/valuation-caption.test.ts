@@ -39,3 +39,29 @@ describe('valuationCaption — the Paid/Now/Δ explanatory line (architect, 2026
     );
   });
 });
+
+describe('valuationCaption — F12 pluralisation ("1 part" / "2 parts", each count independently)', () => {
+  it('singularizes "part" for coverage.items === 1 (the "no part has both…" branch)', () => {
+    expect(
+      valuationCaption({ comparable: { items: 0 }, coverage: { withCurrent: 1, items: 1 } }),
+    ).toBe('Now covers 1 of 1 part · no part has both a cost basis and a price yet');
+  });
+
+  it('pluralizes "parts" for coverage.items > 1 (the "no part has both…" branch)', () => {
+    expect(
+      valuationCaption({ comparable: { items: 0 }, coverage: { withCurrent: 2, items: 5 } }),
+    ).toBe('Now covers 2 of 5 parts · no part has both a cost basis and a price yet');
+  });
+
+  it('singularizes both counts independently when both are 1 (the delta branch)', () => {
+    expect(
+      valuationCaption({ comparable: { items: 1 }, coverage: { withCurrent: 1, items: 1 } }),
+    ).toBe('Now covers 1 of 1 part · delta over the 1 part with both a cost basis and a price');
+  });
+
+  it('pluralizes coverage.items while singularizing comparable.items independently (the delta branch — this was the "1 parts" bug)', () => {
+    expect(
+      valuationCaption({ comparable: { items: 1 }, coverage: { withCurrent: 3, items: 4 } }),
+    ).toBe('Now covers 3 of 4 parts · delta over the 1 part with both a cost basis and a price');
+  });
+});

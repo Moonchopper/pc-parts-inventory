@@ -229,6 +229,100 @@ describe('buildCardTree — Paid/Now/Δ + the shared explanatory caption (Task 7
   });
 });
 
+describe('buildCardTree — D17 Paid/Now render "—" for no data, never $0.00 (F7)', () => {
+  it('Paid — when coverage.withAcquired is 0; Now still shows a real figure', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 0,
+            currentCents: 5000,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 3, withAcquired: 0, withCurrent: 1 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('Paid —');
+    expect(texts.some((t) => t.includes('Now $50.00'))).toBe(true);
+  });
+
+  it('Now — when coverage.withCurrent is 0; Paid still shows a real figure', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 5000,
+            currentCents: 0,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 3, withAcquired: 1, withCurrent: 0 }),
+          },
+        }),
+      ),
+    );
+    expect(texts.some((t) => t.includes('Now —'))).toBe(true);
+    expect(texts.some((t) => t.includes('Paid $50.00'))).toBe(true);
+  });
+
+  it('both Paid and Now are — when neither has any coverage, no $0.00 anywhere', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 0,
+            currentCents: 0,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 3, withAcquired: 0, withCurrent: 0 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('Paid —');
+    expect(texts.some((t) => t.includes('Now —'))).toBe(true);
+    expect(texts.some((t) => t.includes('$0.00'))).toBe(false);
+  });
+
+  it('a real recorded 0 still renders $0.00 — coverage.withAcquired === 1 means a $0 cost basis was actually recorded', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 0,
+            currentCents: 5000,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 3, withAcquired: 1, withCurrent: 1 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('Paid $0.00');
+  });
+});
+
 describe('renderCardPng', () => {
   it('renders a real PNG (magic bytes) over 10000 bytes for the standard fixture', async () => {
     const png = await renderCardPng(

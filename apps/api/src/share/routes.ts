@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { ApiError, SharedBuild } from '@pcpi/contracts';
 import { validationHook } from '../openapi-hook.js';
+import { publicOrigin } from '../public-origin.js';
 import { renderCardPng } from './card.js';
 import { cardETag } from './etag.js';
 import { renderShareMarkdown } from './markdown.js';
@@ -34,7 +35,10 @@ routes.get('/:slug{.+\\.md}', (c) => {
   if (!shared) {
     return c.json(notFound(slug), 404);
   }
-  const shareUrl = `${new URL(c.req.url).origin}/api/v1/share/${shared.slug}`;
+  // F10/D16: a user-facing link always points at the human page `/b/{slug}` on the public origin —
+  // never the API's own request origin (which, in Docker, is the internal `http://api:3000`
+  // hostname), and never `/api/v1/...` (which is JSON, not a page).
+  const shareUrl = `${publicOrigin(new URL(c.req.url).origin)}/b/${shared.slug}`;
   const body = renderShareMarkdown(shared, shareUrl);
   return c.text(body, 200, {
     'content-type': 'text/markdown; charset=utf-8',

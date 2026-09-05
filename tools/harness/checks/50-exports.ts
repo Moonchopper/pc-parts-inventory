@@ -74,6 +74,18 @@ export default {
       ctx.fail(`share.md leaked serials: ${mdLeaks.join(', ')}`);
     }
 
+    // F10/D16: the footer must point at the human page (`/b/{slug}`), never the API's own JSON
+    // route or a Docker-internal hostname.
+    if (!md.includes(`/b/${slug}`)) {
+      ctx.fail(`share.md footer does not contain /b/${slug} (D16 violation)`);
+    }
+    if (md.includes('/api/v1/')) {
+      ctx.fail('share.md footer contains an internal /api/v1/ URL (D16 violation)');
+    }
+    if (md.includes('api:')) {
+      ctx.fail('share.md footer contains an internal "api:" hostname (D16 violation)');
+    }
+
     ctx.counters.share.md.rows = rows;
     ctx.counters.share.md.bytes = mdBytes;
     writeFileSync(join(ctx.artifactsDir, 'share.md'), md, 'utf-8');

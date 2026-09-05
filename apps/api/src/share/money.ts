@@ -25,3 +25,15 @@ export function formatSignedPercent(pct: number): string {
   const sign = pct > 0 ? '+' : pct < 0 ? '-' : '';
   return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
+
+/**
+ * D17 — "no data" never renders as a number. `coverageCount` is the *count of items* backing
+ * `cents` (`coverage.withAcquired` for Paid, `coverage.withCurrent` for Now) — when it is 0 there is
+ * nothing to sum, and the honest answer is "no data" (`—`), not a fake `$0.00`. When a real value of
+ * 0 was actually recorded (`coverageCount >= 1`), `$0.00` is correct and must still render. Both
+ * `markdown.ts` and `card.ts` call this for their Paid/Now figures instead of `formatCents` directly
+ * (F7 — the bug was exactly this call going straight to `formatCents` with no coverage check).
+ */
+export function formatTotalOrDash(cents: number, currency: string, coverageCount: number): string {
+  return coverageCount === 0 ? '—' : formatCents(cents, currency);
+}
