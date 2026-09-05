@@ -1,0 +1,858 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PC Parts Inventory API",
+    "version": "0.1.0"
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "sqlite"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "version",
+          "db"
+        ]
+      },
+      "Import": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ImportKind"
+          },
+          "source": {
+            "type": "string"
+          },
+          "payloadHash": {
+            "type": "string"
+          },
+          "payload": {},
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ImportSummary"
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "processedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "kind",
+          "source",
+          "payloadHash",
+          "status",
+          "receivedAt"
+        ]
+      },
+      "ImportKind": {
+        "type": "string",
+        "enum": [
+          "scan",
+          "order_csv",
+          "manual"
+        ]
+      },
+      "ImportStatus": {
+        "type": "string",
+        "enum": [
+          "received",
+          "processed",
+          "failed"
+        ]
+      },
+      "ImportSummary": {
+        "type": "object",
+        "properties": {
+          "productsCreated": {
+            "type": "integer"
+          },
+          "productsUpdated": {
+            "type": "integer"
+          },
+          "partsCreated": {
+            "type": "integer"
+          },
+          "partsUpdated": {
+            "type": "integer"
+          },
+          "partsShelved": {
+            "type": "integer"
+          },
+          "buildId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productsCreated",
+          "productsUpdated",
+          "partsCreated",
+          "partsUpdated",
+          "partsShelved",
+          "buildId"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ScanPayload": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "scanner": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "os": {
+                "type": "string",
+                "enum": [
+                  "windows",
+                  "macos",
+                  "linux"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "version",
+              "os"
+            ]
+          },
+          "host": {
+            "type": "object",
+            "properties": {
+              "hostname": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scannedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "hostname",
+              "scannedAt"
+            ]
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanComponent"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "scanner",
+          "host",
+          "components"
+        ]
+      },
+      "ScanComponent": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "manufacturer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "partNumber": {
+            "type": "string",
+            "minLength": 1
+          },
+          "serial": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "default": 1
+          },
+          "slot": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specs": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "category",
+          "manufacturer",
+          "model",
+          "specs"
+        ]
+      },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "cpu",
+          "cpu_cooler",
+          "motherboard",
+          "memory",
+          "storage",
+          "gpu",
+          "case",
+          "psu",
+          "case_fan",
+          "monitor",
+          "os",
+          "keyboard",
+          "mouse",
+          "headset",
+          "other"
+        ]
+      },
+      "Build": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/BuildSource"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildItemExpanded"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "slug",
+          "name",
+          "source",
+          "visibility",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "BuildSource": {
+        "type": "string",
+        "enum": [
+          "scan",
+          "manual"
+        ]
+      },
+      "Visibility": {
+        "type": "string",
+        "enum": [
+          "private",
+          "unlisted",
+          "public"
+        ]
+      },
+      "BuildItemExpanded": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BuildItem"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "part": {
+                "$ref": "#/components/schemas/Part"
+              },
+              "product": {
+                "$ref": "#/components/schemas/Product"
+              }
+            },
+            "required": [
+              "part",
+              "product"
+            ]
+          }
+        ]
+      },
+      "Part": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PartStatus"
+          },
+          "acquiredAt": {
+            "type": "string"
+          },
+          "acquiredPriceCents": {
+            "type": "integer"
+          },
+          "acquiredCurrency": {
+            "type": "string"
+          },
+          "acquiredSource": {
+            "type": "string"
+          },
+          "soldAt": {
+            "type": "string"
+          },
+          "soldPriceCents": {
+            "type": "integer"
+          },
+          "importId": {
+            "type": "string"
+          },
+          "identityKey": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "productId",
+          "condition",
+          "quantity",
+          "status",
+          "acquiredCurrency",
+          "identityKey",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "partNumber": {
+            "type": "string"
+          },
+          "upc": {
+            "type": "string"
+          },
+          "specs": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "category",
+          "manufacturer",
+          "model",
+          "specs",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "Condition": {
+        "type": "string",
+        "enum": [
+          "new",
+          "used",
+          "refurbished",
+          "broken"
+        ]
+      },
+      "PartStatus": {
+        "type": "string",
+        "enum": [
+          "in_build",
+          "on_shelf",
+          "sold",
+          "disposed"
+        ]
+      },
+      "BuildItem": {
+        "type": "object",
+        "properties": {
+          "buildId": {
+            "type": "string"
+          },
+          "partId": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "buildId",
+          "partId",
+          "addedAt"
+        ]
+      },
+      "SharedBuild": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedBuildItem"
+            }
+          },
+          "valuation": {
+            "type": "object",
+            "properties": {
+              "acquiredCents": {
+                "type": "integer"
+              },
+              "currentCents": {
+                "type": "integer"
+              },
+              "deltaCents": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "acquiredCents",
+              "currentCents",
+              "deltaCents"
+            ]
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "updatedAt",
+          "items"
+        ]
+      },
+      "SharedBuildItem": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "currentCents": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "manufacturer",
+          "model",
+          "quantity"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Liveness/readiness check.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/scans": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payload already imported (idempotent replay)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Import created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Import found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/builds": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Builds for the local owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Build"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/builds/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Build found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Build"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parts": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Parts for the local owner, embedding product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Part"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products for the local owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/share/{slug}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared build (JSON) — never includes serials, notes, acquiredSource or owner data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedBuild"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or private",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}
