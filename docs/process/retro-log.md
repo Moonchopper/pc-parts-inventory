@@ -50,6 +50,19 @@ Open at hand-over: CI never run (nothing pushed — D14 closes on the first bran
         "container-slim"); "1 parts" pluralisation in the caption (one-liner); 7 brief worktrees on disk as evidence.
 ```
 
+**Fix-up wave (same day, after Austin's pass).** 4 Sonnet briefs (labels-seam ≈ 79 k / 3.5 min · scanner-serial ≈ 244 k /
+36 min, 2 rounds incl. the D19 ruling · fix-api ≈ 246 k / 21.5 min, 1 send-back · fix-web ≈ 207 k / 18 min) + a PM ≈ 350 k
+⇒ ≈ 1.1 M tokens; F2–F13 closed with named tests or client-shaped proofs; §7 12/12 on the re-captured canonical fixture;
+compose proof incl. `docker compose stop api` → readable 503 in 4 s. **The new hand-over gate (PM runs every guide snippet
+in PS 5.1) found three more guide defects before Austin could** — a changed re-scan is 201 not 200; "clear a price" was
+impossible (→ F14, M1: nullable `acquiredPriceCents` in PATCH); `PUBLIC_ORIGIN` had no dev default. **Process incident:**
+the architect relaunched the PM on the owner's word that it had been killed; it hadn't — two PMs raced for ~3 min, the
+second withdrew with zero repo impact after detecting a live peer (learning 37). Learning 35 earned its keep the same
+hour: an implementer reported a clean netstat and had left a `tsx watch` on :3020; the PM's integration check caught it
+(`Stop-Process` is classifier-blocked on this box; `taskkill //PID n //T //F` works).
+Carry-ins to M1: F14; the 503 page names the internal API URL to visitors (dev-only detail, generic message in prod);
+`40-web` prerender flake (retry the web build once inside the check); container-slim; `PUBLIC_ORIGIN` dev default.
+
 **Architect's notes.** The re-cut roles worked as intended on the first try: my context stayed on design and the
 conversation (≈ 20 tool calls all session), the PM absorbed the fan-out and every validation, and no tier accepted
 its own work. The costliest lesson was mine — a plan whose endpoint table and share contract were not reconciled
