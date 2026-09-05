@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { valuationCaption } from '@pcpi/contracts';
   import { formatMoney, formatPercent, formatSignedMoney } from '$lib/money.js';
   import type { PageData } from './$types.js';
 
@@ -94,7 +95,7 @@
           : ''}
       {/if}
     </p>
-    <p class="coverage-caption">{v.coverage.withCurrent} of {v.coverage.items} priced</p>
+    <p class="coverage-caption">{valuationCaption(v)}</p>
   {/if}
 
   <p>

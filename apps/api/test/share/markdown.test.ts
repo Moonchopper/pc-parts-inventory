@@ -148,7 +148,7 @@ describe('renderShareMarkdown — Paid/Now/Δ totals (Task 7 presentation)', () 
     expect(md).not.toContain('**Δ**');
   });
 
-  it('renders Paid, Now, a signed Δ and an "n of m priced" caption when valuation is present', () => {
+  it('renders Paid, Now, a signed Δ and the shared explanatory caption when valuation is present', () => {
     const md = renderShareMarkdown(
       build({
         valuation: {
@@ -169,7 +169,56 @@ describe('renderShareMarkdown — Paid/Now/Δ totals (Task 7 presentation)', () 
     expect(md).toContain('| **Paid** | | **$1,750.00** |');
     expect(md).toContain('| **Now** | | **$1,899.98** |');
     expect(md).toContain('+$149.98 (+8.6%)');
-    expect(md).toContain('*2 of 3 priced*');
+    // Same wording `valuationCaption` (`@pcpi/contracts`) produces for the card/share page/build
+    // page — asserted verbatim here rather than re-deriving it, since drift is exactly the bug this
+    // shared helper exists to prevent.
+    expect(md).toContain(
+      '*Now covers 2 of 3 parts · delta over the 2 parts with both a cost basis and a price*',
+    );
+  });
+
+  it('caption reads "no part has both…" when nothing is comparable but some parts are priced', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 0,
+          currentCents: 6000,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 0, withCurrent: 1 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain(
+      '*Now covers 1 of 3 parts · no part has both a cost basis and a price yet*',
+    );
+  });
+
+  it('caption reads "No prices yet…" when coverage.withCurrent is 0', () => {
+    const md = renderShareMarkdown(
+      build({
+        valuation: {
+          acquiredCents: 5000,
+          currentCents: 0,
+          comparable: comparable({
+            items: 0,
+            acquiredCents: 0,
+            currentCents: 0,
+            deltaCents: 0,
+            deltaPct: null,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 1, withCurrent: 0 }),
+        },
+      }),
+      'https://example.test',
+    );
+    expect(md).toContain('*No prices yet · add a provider or refresh*');
   });
 
   it('signs a negative delta with a minus and no fake percent when comparable.acquiredCents is 0', () => {

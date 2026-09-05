@@ -128,8 +128,8 @@ describe('buildCardTree — currency (Task 1/2, architect 2026-09-05)', () => {
   });
 });
 
-describe('buildCardTree — Paid/Now/Δ + "n of m priced" (Task 7 presentation)', () => {
-  it('shows the coverage caption', () => {
+describe('buildCardTree — Paid/Now/Δ + the shared explanatory caption (Task 7 presentation, revised 2026-09-05)', () => {
+  it('shows the "Δ over the n parts…" caption, wrapped to its expected 2 lines, when some items are comparable', () => {
     const texts = collectText(
       buildCardTree(
         build({
@@ -148,9 +148,60 @@ describe('buildCardTree — Paid/Now/Δ + "n of m priced" (Task 7 presentation)'
         }),
       ),
     );
-    expect(texts.some((t) => t.includes('2 of 3 priced'))).toBe(true);
+    // `valuationCaption` (`@pcpi/contracts`) produces one sentence; `wrapCaptionLines` (card.ts)
+    // splits it deterministically at a word boundary — asserted here as the exact two lines it
+    // must produce for this input, not a substring match, since the split point is load-bearing
+    // for the clipping fix (the footer layout budgets exactly 2 caption lines).
+    expect(texts).toContain('Now covers 2 of 3 parts · delta over the 2 parts with');
+    expect(texts).toContain('both a cost basis and a price');
+    expect(texts.every((t) => !t.includes('Δ'))).toBe(true);
     expect(texts.some((t) => t.includes('Paid $1,750.00'))).toBe(true);
     expect(texts.some((t) => t.includes('Now $1,899.98'))).toBe(true);
+  });
+
+  it('caption reads "no part has both…" (1 line) when nothing is comparable but some parts are priced', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 0,
+            currentCents: 6000,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 6, withAcquired: 0, withCurrent: 5 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('Now covers 5 of 6 parts · no part has both a cost basis');
+    expect(texts).toContain('and a price yet');
+  });
+
+  it('caption reads "No prices yet…" (single line, no wrap) when coverage.withCurrent is 0', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 5000,
+            currentCents: 0,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 6, withAcquired: 1, withCurrent: 0 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('No prices yet · add a provider or refresh');
   });
 
   it('renders Δ as an em dash — never 0 or +0.0% — when comparable.items is 0', () => {

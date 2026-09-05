@@ -1,4 +1,5 @@
 import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
+import { valuationCaption } from '@pcpi/contracts';
 import { categoryLabel } from './category-labels.js';
 import { itemDisplayName } from './item-name.js';
 import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
@@ -23,9 +24,14 @@ function deltaCell(valuation: NonNullable<SharedBuild['valuation']>, currency: s
  * the §7 integration gate asserts `share.md.rows == items`. Totals rows are omitted entirely when
  * `build.valuation` is absent rather than showing a fake "$0.00" or "NaN".
  *
- * Presentation (Task 7, architect): Paid / Now / Δ, with a "n of m priced" caption from `coverage`
- * — replaces the old "Total (current)/Total (paid)/Delta" rows, which read the flat
- * `deltaCents`/`deltaPct` the revised `Valuation` contract no longer carries at the top level.
+ * Presentation (Task 7, architect, revised 2026-09-05): Paid / Now / Δ, with an explanatory italic
+ * caption below from `valuationCaption` (`@pcpi/contracts`) — replaces the old "Total (current)/
+ * Total (paid)/Delta" rows, which read the flat `deltaCents`/`deltaPct` the revised `Valuation`
+ * contract no longer carries at the top level. The caption exists because `Paid`/`Now` sum over
+ * different item sets (D5 no-fallback), so `Paid − Now` does not equal `Δ` in general — the caption
+ * names which parts fed which number instead of leaving the reader to do that subtraction and get
+ * confused. Same wording as the card, the share page and the build page — all four call
+ * `valuationCaption` directly rather than each composing their own string.
  */
 export function renderShareMarkdown(build: SharedBuild, shareUrl: string): string {
   const lines: string[] = [];
@@ -41,12 +47,12 @@ export function renderShareMarkdown(build: SharedBuild, shareUrl: string): strin
   }
 
   if (build.valuation) {
-    const { acquiredCents, currentCents, coverage } = build.valuation;
+    const { acquiredCents, currentCents } = build.valuation;
     lines.push(`| **Paid** | | **${formatCents(acquiredCents, build.currency)}** |`);
     lines.push(`| **Now** | | **${formatCents(currentCents, build.currency)}** |`);
     lines.push(`| **Δ** | | **${deltaCell(build.valuation, build.currency)}** |`);
     lines.push('');
-    lines.push(`*${coverage.withCurrent} of ${coverage.items} priced*`);
+    lines.push(`*${valuationCaption(build.valuation)}*`);
   }
 
   lines.push('');

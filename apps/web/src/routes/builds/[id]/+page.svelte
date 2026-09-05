@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { valuationCaption } from '@pcpi/contracts';
   import { deltaClass, formatMoney, formatPercent, formatSignedMoney } from '$lib/money.js';
   import type { ActionData, PageData } from './$types.js';
 
@@ -93,7 +94,7 @@
       </span>
     {/if}
   </p>
-  <p class="coverage-caption">{v.coverage.withCurrent} of {v.coverage.items} priced</p>
+  <p class="coverage-caption">{valuationCaption(v)}</p>
 {:else}
   <p>Valuation unavailable.</p>
 {/if}
