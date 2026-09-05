@@ -5,6 +5,7 @@ import {
   formatMoney,
   formatPercent,
   formatSignedMoney,
+  formatTotalOrDash,
 } from '../src/lib/money.js';
 
 describe('formatMoney', () => {
@@ -51,6 +52,20 @@ describe('deltaDirection / deltaClass', () => {
   it('is flat for no change', () => {
     expect(deltaDirection(0)).toBe('flat');
     expect(deltaClass(0)).toBe('delta-flat');
+  });
+});
+
+describe('formatTotalOrDash', () => {
+  it('dashes when the coverage count is 0, even for a nonzero total (D17/F7)', () => {
+    expect(formatTotalOrDash(14998, 'USD', 0)).toBe('—');
+  });
+
+  it('renders a real recorded zero as $0.00, never a dash', () => {
+    expect(formatTotalOrDash(0, 'USD', 1)).toBe('$0.00');
+  });
+
+  it('renders a normal value when coverage is nonzero', () => {
+    expect(formatTotalOrDash(123456, 'USD', 3)).toBe('$1,234.56');
   });
 });
 

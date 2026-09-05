@@ -35,3 +35,15 @@ export function formatPercent(pct: number): string {
   const sign = pct > 0 ? '+' : '';
   return `${sign}${pct.toFixed(1)}%`;
 }
+
+/**
+ * D17 — a top-level valuation total (`Paid`/`Now`) dashes when its own `ValuationCoverage` count
+ * (`withAcquired`/`withCurrent`) is 0, rather than rendering `formatMoney(0, …)` = `$0.00`, which
+ * would misread as "this build cost nothing" instead of "nobody has recorded a price yet". `$0.00`
+ * is reserved for a real recorded zero. One helper for every total on every page (share, build,
+ * inventory) so the rule can't drift between them — never call `formatMoney` directly on a
+ * `Valuation`/`SharedBuild.valuation` total.
+ */
+export function formatTotalOrDash(cents: number, currency: string, coverageCount: number): string {
+  return coverageCount === 0 ? '—' : formatMoney(cents, currency);
+}

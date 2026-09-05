@@ -6,28 +6,35 @@ import {
   getValuation,
   listParts,
   removeBuildItem,
+  rethrowApiUnreachable,
 } from '$lib/server/api.js';
 import type { Actions, PageServerLoad } from './$types.js';
 
 export const load: PageServerLoad = async ({ params }) => {
-  const build = await getBuild(params.id);
-  if (!build) {
-    error(404, `Build ${params.id} not found`);
+  try {
+    const build = await getBuild(params.id);
+    if (!build) {
+      error(404, `Build ${params.id} not found`);
+    }
+
+    const [allParts, valuation] = await Promise.all([
+      listParts(),
+      // §5's `GET /builds/{id}/valuation` may not exist on this branch yet (Recon #5) — degrade to
+      // "valuation unavailable" rather than fail the whole page.
+      getValuation(params.id),
+    ]);
+
+    const inBuildIds = new Set((build.items ?? []).map((item) => item.partId));
+    const availableParts = allParts.filter(
+      (part) => part.status === 'on_shelf' && !inBuildIds.has(part.id),
+    );
+
+    return { build, availableParts, valuation };
+  } catch (err) {
+    // F2 — same rule as the share page: an unreachable API 503s through `+error.svelte` instead of
+    // hanging or crashing; anything else (including the `error(404, …)` above) is rethrown as-is.
+    rethrowApiUnreachable(err);
   }
-
-  const [allParts, valuation] = await Promise.all([
-    listParts(),
-    // §5's `GET /builds/{id}/valuation` may not exist on this branch yet (Recon #5) — degrade to
-    // "valuation unavailable" rather than fail the whole page.
-    getValuation(params.id),
-  ]);
-
-  const inBuildIds = new Set((build.items ?? []).map((item) => item.partId));
-  const availableParts = allParts.filter(
-    (part) => part.status === 'on_shelf' && !inBuildIds.has(part.id),
-  );
-
-  return { build, availableParts, valuation };
 };
 
 function messageFor(err: unknown, fallback: string): string {

@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { buildOgImageUrl, buildOgTags, buildShareUrl, resolveOrigin } from '$lib/og.js';
-import { getSharedBuild } from '$lib/server/api.js';
+import { getSharedBuild, rethrowApiUnreachable } from '$lib/server/api.js';
 import type { PageServerLoad } from './$types.js';
 
 function summarize(build: NonNullable<Awaited<ReturnType<typeof getSharedBuild>>>): string {
@@ -17,21 +17,27 @@ function summarize(build: NonNullable<Awaited<ReturnType<typeof getSharedBuild>>
  * page, never a stack trace.
  */
 export const load: PageServerLoad = async ({ params, url }) => {
-  const build = await getSharedBuild(params.slug);
-  if (!build) {
-    error(404, `Build ${params.slug} not found`);
+  try {
+    const build = await getSharedBuild(params.slug);
+    if (!build) {
+      error(404, `Build ${params.slug} not found`);
+    }
+
+    const origin = resolveOrigin(url.origin, env.PUBLIC_ORIGIN);
+    const description = summarize(build);
+    const ogTags = buildOgTags({
+      title: build.name,
+      description,
+      // Recon #4 — W0.5's card.png route may 404 in this worktree; the tag is still emitted pointing
+      // at the right (eventually reachable) absolute URL.
+      imageUrl: buildOgImageUrl(origin, build.slug),
+      pageUrl: buildShareUrl(origin, build.slug),
+    });
+
+    return { build, description, ogTags };
+  } catch (err) {
+    // F2 — an unreachable API must 503 through `+error.svelte` with a readable message, never hang
+    // or show a stack trace; anything else (including the `error(404, …)` above) is rethrown as-is.
+    rethrowApiUnreachable(err);
   }
-
-  const origin = resolveOrigin(url.origin, env.PUBLIC_ORIGIN);
-  const description = summarize(build);
-  const ogTags = buildOgTags({
-    title: build.name,
-    description,
-    // Recon #4 — W0.5's card.png route may 404 in this worktree; the tag is still emitted pointing
-    // at the right (eventually reachable) absolute URL.
-    imageUrl: buildOgImageUrl(origin, build.slug),
-    pageUrl: buildShareUrl(origin, build.slug),
-  });
-
-  return { build, description, ogTags };
 };

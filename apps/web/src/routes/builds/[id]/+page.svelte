@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { valuationCaption } from '@pcpi/contracts';
-  import { deltaClass, formatMoney, formatPercent, formatSignedMoney } from '$lib/money.js';
+  import { categoryLabel, valuationCaption } from '@pcpi/contracts';
+  import {
+    deltaClass,
+    formatMoney,
+    formatPercent,
+    formatSignedMoney,
+    formatTotalOrDash,
+  } from '$lib/money.js';
   import type { ActionData, PageData } from './$types.js';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -39,7 +45,7 @@
     <tbody>
       {#each data.build.items as item (item.partId)}
         <tr>
-          <td>{item.product.category}</td>
+          <td>{categoryLabel(item.product.category)}</td>
           <td>{item.product.manufacturer} {item.product.model}</td>
           <td>{item.part.serial ?? '—'}</td>
           <td>{item.slot ?? '—'}</td>
@@ -83,7 +89,11 @@
 {#if data.valuation}
   {@const v = data.valuation}
   <p>
-    Paid: {formatMoney(v.acquiredCents, v.currency)} · Now: {formatMoney(v.currentCents, v.currency)} ·
+    Paid: {formatTotalOrDash(v.acquiredCents, v.currency, v.coverage.withAcquired)} · Now: {formatTotalOrDash(
+      v.currentCents,
+      v.currency,
+      v.coverage.withCurrent,
+    )} ·
     {#if v.comparable.items === 0}
       <span class="delta-flat">Δ: —</span>
     {:else}
