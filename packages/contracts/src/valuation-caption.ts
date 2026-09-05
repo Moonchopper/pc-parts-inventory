@@ -22,6 +22,11 @@ import type { ValuationComparable, ValuationCoverage } from './domain.js';
  * for the `→` arrow glyph it avoids for the same reason. One wording shared by all four surfaces
  * means it must be safe on the least capable one.
  */
+/** F12 — "1 part" / "2 parts": every count in this caption pluralizes its own noun independently. */
+function partsNoun(count: number): string {
+  return count === 1 ? 'part' : 'parts';
+}
+
 export function valuationCaption(v: {
   comparable: Pick<ValuationComparable, 'items'>;
   coverage: Pick<ValuationCoverage, 'withCurrent' | 'items'>;
@@ -33,8 +38,8 @@ export function valuationCaption(v: {
   }
 
   if (comparable.items === 0) {
-    return `Now covers ${coverage.withCurrent} of ${coverage.items} parts · no part has both a cost basis and a price yet`;
+    return `Now covers ${coverage.withCurrent} of ${coverage.items} ${partsNoun(coverage.items)} · no part has both a cost basis and a price yet`;
   }
 
-  return `Now covers ${coverage.withCurrent} of ${coverage.items} parts · delta over the ${comparable.items} parts with both a cost basis and a price`;
+  return `Now covers ${coverage.withCurrent} of ${coverage.items} ${partsNoun(coverage.items)} · delta over the ${comparable.items} ${partsNoun(comparable.items)} with both a cost basis and a price`;
 }

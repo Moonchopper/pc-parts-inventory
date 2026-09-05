@@ -4,6 +4,7 @@ import { getDb } from '../db/client.js';
 import { jobs, priceQuotes, products, providerLinks } from '../db/schema.js';
 import { generateId } from '../ids.js';
 import { getActiveProviders } from '../pricing/registry.js';
+import { createDebouncedSingleFlight } from './wake.js';
 
 export type JobKind = 'price_refresh' | 'import_process';
 type JobRow = typeof jobs.$inferSelect;
@@ -11,6 +12,22 @@ type JobRow = typeof jobs.$inferSelect;
 function nowIso(): string {
   return new Date().toISOString();
 }
+
+/**
+ * F9/D18 — same env-guard pair as `startTickLoopUnlessDisabled` below, and for the same reason: the
+ * harness drives jobs deterministically through `POST /jobs/run-due` and asserts on how many jobs
+ * *that call* ran, so a wake that also fires under `HARNESS=1` would make it flaky. `VITEST` is set
+ * by vitest itself, so unit tests that call `enqueueJob` and then assert on `runDueJobs`'s own return
+ * value (jobs.test.ts) are unaffected unless a test explicitly opts back in (jobs-wake.test.ts).
+ */
+function wakeDisabled(): boolean {
+  return process.env.HARNESS === '1' || Boolean(process.env.VITEST);
+}
+
+// One shared debounced/single-flight wake for the whole process — every `enqueueJob` call triggers
+// it; `wake.ts` guarantees any number of triggers coalesce into a single `runDueJobs()` pass, and a
+// pass already running is never re-entered (see wake.ts's contract + wake.test.ts).
+const wake = createDebouncedSingleFlight(() => runDueJobs());
 
 /**
  * D10 — every job carries the `ownerId` of the thing it acts on (D3 correction, "PM addendum 2").
@@ -28,6 +45,7 @@ export function enqueueJob(
     .insert(jobs)
     .values({ id, ownerId, kind, runAt, status: 'queued', attempts: 0, payload })
     .run();
+  if (!wakeDisabled()) wake.trigger();
   return id;
 }
 

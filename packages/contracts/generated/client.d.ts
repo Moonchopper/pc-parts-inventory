@@ -1354,6 +1354,7 @@ export interface components {
             version: string;
             /** @enum {string} */
             db: "sqlite";
+            instanceId: string;
         };
         Import: {
             id: string;

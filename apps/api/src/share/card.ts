@@ -4,7 +4,7 @@ import { Resvg } from '@resvg/resvg-js';
 import satori from 'satori';
 import { loadCardFonts } from './fonts.js';
 import { itemDisplayName } from './item-name.js';
-import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
+import { formatCents, formatSignedCents, formatSignedPercent, formatTotalOrDash } from './money.js';
 import { truncate } from './text.js';
 
 export const CARD_WIDTH = 1200;
@@ -135,7 +135,7 @@ function valuationSummary(build: SharedBuild): CardNode {
     });
   }
 
-  const { acquiredCents, currentCents, comparable } = build.valuation;
+  const { acquiredCents, currentCents, comparable, coverage } = build.valuation;
   const hasComparable = comparable.items > 0;
   const deltaColor = !hasComparable
     ? COLOR_MUTED
@@ -152,7 +152,9 @@ function valuationSummary(build: SharedBuild): CardNode {
 
   return div({ display: 'flex', flexDirection: 'column', gap: 4 }, [
     div({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16 }, [
-      text(`Paid ${formatCents(acquiredCents, build.currency)}`, {
+      // F7/D17: `—` when `coverage.with*Cents === 0` (nothing backs the number), never a fake
+      // `$0.00` — same helper markdown.ts uses for the same rule.
+      text(`Paid ${formatTotalOrDash(acquiredCents, build.currency, coverage.withAcquired)}`, {
         fontSize: 22,
         fontWeight: 400,
         color: COLOR_MUTED,
@@ -162,7 +164,7 @@ function valuationSummary(build: SharedBuild): CardNode {
       // instead of failing loudly — invisible until this brief actually populated `valuation` for
       // the first time. `·` is already proven safe elsewhere on this card ("Shared build · slug").
       text('·', { fontSize: 22, fontWeight: 400, color: COLOR_FAINT }),
-      text(`Now ${formatCents(currentCents, build.currency)}`, {
+      text(`Now ${formatTotalOrDash(currentCents, build.currency, coverage.withCurrent)}`, {
         fontSize: 22,
         fontWeight: 700,
         color: COLOR_TEXT,

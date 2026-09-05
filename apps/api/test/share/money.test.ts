@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatCents, formatSignedCents, formatSignedPercent } from '../../src/share/money.js';
+import {
+  formatCents,
+  formatSignedCents,
+  formatSignedPercent,
+  formatTotalOrDash,
+} from '../../src/share/money.js';
 
 describe('formatCents', () => {
   it('formats integer minor units as USD (D6: display only at the edge)', () => {
@@ -31,5 +36,21 @@ describe('formatSignedPercent', () => {
     expect(formatSignedPercent(8.6)).toBe('+8.6%');
     expect(formatSignedPercent(-8.6)).toBe('-8.6%');
     expect(formatSignedPercent(0)).toBe('0.0%');
+  });
+});
+
+describe('formatTotalOrDash — D17 "no data" never renders as $0.00 (F7)', () => {
+  it('renders — when coverageCount is 0, regardless of the cents value', () => {
+    expect(formatTotalOrDash(0, 'USD', 0)).toBe('—');
+    expect(formatTotalOrDash(47900, 'USD', 0)).toBe('—');
+  });
+
+  it('renders a real $0.00 when coverageCount is >= 1 and the recorded value really is 0', () => {
+    expect(formatTotalOrDash(0, 'USD', 1)).toBe('$0.00');
+  });
+
+  it('renders the formatted total when coverageCount is >= 1 and cents is non-zero', () => {
+    expect(formatTotalOrDash(47900, 'USD', 1)).toBe('$479.00');
+    expect(formatTotalOrDash(123456, 'EUR', 3)).toBe('€1,234.56');
   });
 });

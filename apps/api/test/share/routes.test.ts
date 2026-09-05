@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ScanPayload } from '@pcpi/contracts';
 import { eq } from 'drizzle-orm';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
 import { createApp } from '../../src/app.js';
 import { getDb } from '../../src/db/client.js';
@@ -82,6 +82,30 @@ describe('GET /api/v1/share/{slug}.md', () => {
     } finally {
       getDb().update(builds).set({ visibility: 'unlisted' }).where(eq(builds.id, buildId)).run();
     }
+  });
+});
+
+describe('GET /api/v1/share/{slug}.md — footer URL (F10/D16)', () => {
+  afterEach(() => {
+    delete process.env.PUBLIC_ORIGIN;
+  });
+
+  it('with PUBLIC_ORIGIN unset: footer points at /b/{slug} on the request origin, never /api/v1/', async () => {
+    delete process.env.PUBLIC_ORIGIN;
+    const res = await app.request(`/api/v1/share/${slug}.md`);
+    const md = await res.text();
+    expect(md).toContain(`/b/${slug}`);
+    expect(md).not.toContain('/api/v1/');
+    expect(md).not.toContain('api:');
+  });
+
+  it('with PUBLIC_ORIGIN set: footer uses it verbatim, still /b/{slug}, never /api/v1/ or api:', async () => {
+    process.env.PUBLIC_ORIGIN = 'http://localhost:5173';
+    const res = await app.request(`/api/v1/share/${slug}.md`);
+    const md = await res.text();
+    expect(md).toContain(`http://localhost:5173/b/${slug}`);
+    expect(md).not.toContain('/api/v1/');
+    expect(md).not.toContain('api:');
   });
 });
 

@@ -35,6 +35,13 @@ describe('GET /api/v1/health', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, db: 'sqlite' });
   });
+
+  it('carries a per-process instanceId (F2 — lets a self-check tell this process apart from another listener)', async () => {
+    const res = await app.request('/api/v1/health');
+    const body = await res.json();
+    expect(typeof body.instanceId).toBe('string');
+    expect(body.instanceId.length).toBeGreaterThan(0);
+  });
 });
 
 describe('POST /api/v1/imports/scans (D8)', () => {

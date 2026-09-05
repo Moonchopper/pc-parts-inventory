@@ -147,6 +147,59 @@ describe('jobs runner — D5 append-only', () => {
   });
 });
 
+describe('enqueueJob wake-on-enqueue — F9/D18 (real DB, real fixture provider)', () => {
+  it('three enqueueJob calls made back-to-back leave all three jobs done, with no explicit runDueJobs/run-due call', async () => {
+    const previousVitest = process.env.VITEST;
+    delete process.env.VITEST; // opt back into the wake this file's env normally disables
+    try {
+      const ids = [insertProduct(), insertProduct(), insertProduct()].map((productId) => {
+        insertLink(productId, { confidence: 1, verified: true });
+        return enqueueJob('price_refresh', LOCAL_OWNER_ID, { productId });
+      });
+
+      // Poll briefly — the wake is debounced (0ms) + async, not synchronous with enqueueJob.
+      const deadline = Date.now() + 2000;
+      let rows: Array<typeof jobs.$inferSelect> = [];
+      for (;;) {
+        rows = ids.map(
+          (id) =>
+            getDb().select().from(jobs).where(eq(jobs.id, id)).get() as typeof jobs.$inferSelect,
+        );
+        if (rows.every((r) => r.status === 'done')) break;
+        if (Date.now() > deadline) break;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+
+      expect(rows.map((r) => r.status)).toEqual(['done', 'done', 'done']);
+    } finally {
+      if (previousVitest === undefined) delete process.env.VITEST;
+      else process.env.VITEST = previousVitest;
+    }
+  });
+
+  it('no-ops under HARNESS=1 — an enqueued job stays queued (the harness must drive jobs deterministically via POST /jobs/run-due only)', async () => {
+    const previousVitest = process.env.VITEST;
+    const previousHarness = process.env.HARNESS;
+    delete process.env.VITEST;
+    process.env.HARNESS = '1';
+    try {
+      const productId = insertProduct();
+      insertLink(productId, { confidence: 1, verified: true });
+      const jobId = enqueueJob('price_refresh', LOCAL_OWNER_ID, { productId });
+
+      await new Promise((r) => setTimeout(r, 100)); // give a (wrongly-firing) wake time to act
+
+      const row = getDb().select().from(jobs).where(eq(jobs.id, jobId)).get();
+      expect(row?.status).toBe('queued');
+    } finally {
+      if (previousVitest === undefined) delete process.env.VITEST;
+      else process.env.VITEST = previousVitest;
+      if (previousHarness === undefined) delete process.env.HARNESS;
+      else process.env.HARNESS = previousHarness;
+    }
+  });
+});
+
 describe('POST /api/v1/jobs/run-due (D10 — HARNESS=1 / NODE_ENV=development only)', () => {
   it('404s when neither HARNESS=1 nor NODE_ENV=development', async () => {
     const previousHarness = process.env.HARNESS;
