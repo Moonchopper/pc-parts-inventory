@@ -33,6 +33,7 @@ by the PM *in Windows PowerShell 5.1* before hand-over, and `feat/m0-seed` is re
 | D16 | **`PUBLIC_ORIGIN` is an API contract.** The API never derives a user-facing URL from its own request origin. `PUBLIC_ORIGIN` env (default: the request origin, dev only) is the one source for any URL that leaves the system (Markdown footer, future webhooks/emails). Compose sets it equal to the web's `ORIGIN`. A user-facing link always points at the human page `/b/{slug}`, never at `/api/v1/…`. |
 | D17 | **"No data" never renders as a number.** `Paid`/`Now`/`Δ`/per-item price render `—` when the underlying coverage count is 0 or the value is absent — in every renderer (card, Markdown, share page, build page, inventory). `$0.00` appears only when a real value of 0 was recorded. |
 | D18 | **Enqueue wakes the runner.** `enqueue()` schedules an immediate `runDue()` (debounced, single-flight); the 30 s tick stays as the safety net. `pnpm dev` runs the API with `NODE_ENV=development` so `POST /jobs/run-due` exists in dev. |
+| D19 | **The scanner emits components in a deterministic order** (architect ruling on FX.1's escalation, 2026-09-05). `scan.ps1` sorts `components` before emit by category (the `M0-seed.md` §3 display order), then manufacturer, then model, then `serial ?? slot ?? ''` — all case-insensitive — so two consecutive captures of the same machine are byte-identical except `host.scannedAt`. WMI enumeration order is *not* stable (MOONPC's three monitors swap positions between sessions, reproducibly), which made the committed fixture a moving artifact and every fixture diff unreadable. D8 is unaffected: import keys on identity, never on position. |
 
 ## Work items (parallel — disjoint scopes; branches `feat/m0-fix-<slug>` from `feat/m0-seed`)
 
@@ -41,6 +42,9 @@ by the PM *in Windows PowerShell 5.1* before hand-over, and `feat/m0-seed` is re
   `_`. Add the NVMe case (`0000_0000_0000_0001_00A0_7523_E87F_6C0C.`) to the Pester tests and `-SelfTest`.
 - **Re-capture the fixture** on this machine (`-RedactSerials`) so `MOONPC.redacted.json`'s storage hash reflects
   the cleaned serial; confirm the only diff vs. the committed fixture is that one hash (+ `scannedAt`).
+- **D19 (added mid-wave by the architect, on FX.1's escalation):** sort `components` before emit; re-capture the
+  fixture *after* the sort lands so the committed artifact is canonical. Two consecutive captures must be
+  byte-identical except `scannedAt`.
 - Acceptance: SelfTest + Pester green; fresh scan ≡ committed fixture bar `scannedAt`; `pnpm --filter
   @pcpi/contracts validate` on the new fixture.
 - Note for the PM's guide: existing DBs carry the old identity key for that part — dev DB is disposable

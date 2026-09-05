@@ -118,3 +118,53 @@ Report in playbook §9 format: `STATUS`, `Changed`, `Verified` (command + output
 don't claim**), `Evidence` (the fixture diff, the hash proof, the harness counters quoted, your one-line reading of
 `card.png`), `Open issues`, `Escalations`, `Follow-ups`. Gate tails also go in the final commit message. No TODOs.
 Commit on `feat/m0-fix-scanner-serial` in your worktree — never on `main`, never on `feat/m0-seed`. Do not merge.
+
+---
+
+## Addendum — D19: deterministic component order (architect ruling, 2026-09-05, mid-brief)
+
+**Why:** the re-capture came back with MOONPC's three monitors in a different array position (WMI enumeration
+order is unstable and reproducibly so). Hand-normalising the fixture back to the old order hides the problem
+rather than fixing it; the architect's ruling is that the *scanner* must emit a stable order, so the committed
+fixture is a canonical artifact and every future fixture diff is readable. Recorded as **D19** in
+`docs/milestones/M0-fixup.md`. D8 is unaffected — import keys on identity, never on position.
+
+**Contract:**
+```powershell
+# ScanLib.ps1 — new, exported, unit-testable (do not inline this in scan.ps1's emit path):
+Sort-ScanComponents -Components <object[]>   # -> object[] in a deterministic order
+#   category, in the M0-seed.md §3 display order:
+#     cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu, case_fan,
+#     monitor, os, keyboard, mouse, headset, other
+#   then manufacturer, then model, then (serial ?? slot ?? '') — all case-insensitive.
+```
+- An unknown/unlisted category sorts last (after `other`), never crashes.
+- **`Sort-Object` is not stable in Windows PowerShell 5.1.** Two components that produce an identical key must
+  still come out in a fixed order, so add a final tiebreak on the component's own compact JSON
+  (`ConvertTo-Json -Compress -Depth 10`) — that guarantees byte-identical output for an identical multiset of
+  components. This is an implementation detail of the last resort, not a change to the key order above.
+- Sorting happens **once, just before emit**, so `-OutFile`, the `-ApiUrl` POST body and the redacted fixture all
+  carry the same order.
+
+**Scope addition:** none beyond the files you already have (`ScanLib.ps1`, `scan.ps1`, `ScanLib.Tests.ps1`,
+`README.md`, the fixture). `packages/contracts/fixtures/cost-basis.json` stays as you left it — the storage key
+does not change again.
+
+**Acceptance additions:**
+- [ ] `-SelfTest` and Pester both cover `Sort-ScanComponents`: category order (a shuffled input comes back in §3
+      order), manufacturer/model/serial tiebreaks, case-insensitivity, an unknown category sorting last, and two
+      identical-key components coming out in a fixed order.
+- [ ] **Two consecutive real captures are byte-identical except `host.scannedAt`.** Capture twice to temp files,
+      diff them, and paste the proof (the only differing line is `scannedAt`).
+- [ ] **Re-capture the committed fixture after the sort lands** (`-RedactSerials`), replacing the hand-normalised
+      one. Its diff vs. the *current committed* file may now legitimately show the monitor reordering as well as
+      `scannedAt` — that is expected, once. Paste the diff.
+- [ ] `pnpm --filter @pcpi/contracts validate tools/scanner/fixtures/MOONPC.redacted.json` green, and
+      `pnpm harness --name fx-scanner2 --fixture tools/scanner/fixtures/MOONPC.redacted.json` green with the same
+      counters as before (the order change must not move `productsCreated=9`, `partsCreated=10`,
+      `quotesRecorded=4`, `share.json.items=9`, `share.md.rows=9`, cost-basis matching **4** parts).
+- [ ] The `netstat` check again, and the gate tails in the commit message as before.
+
+**Non-goal:** do not sort or re-order anything on the TypeScript side (`packages/core/src/normalize.ts`, the API's
+item ordering) — the API already sorts its own output (`compareByCategoryOrder`), and that is a different rule
+serving a different surface.
