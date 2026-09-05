@@ -76,6 +76,41 @@ Describe 'Clean-Manufacturer' {
     }
 }
 
+Describe 'Remove-ManufacturerPrefix' {
+    It 'strips a matching prefix (BenQ)' {
+        (Remove-ManufacturerPrefix -Manufacturer 'BenQ' -Model 'BenQ XL2430T') | Should Be 'XL2430T'
+    }
+    It 'leaves a non-matching model untouched (Acer)' {
+        (Remove-ManufacturerPrefix -Manufacturer 'Acer' -Model 'ED323QUR A') | Should Be 'ED323QUR A'
+    }
+    It 'matches case-insensitively (GIGABYTE vs Gigabyte)' {
+        (Remove-ManufacturerPrefix -Manufacturer 'GIGABYTE' -Model 'Gigabyte B650 EAGLE AX') | Should Be 'B650 EAGLE AX'
+    }
+    It 'never returns an empty model when manufacturer equals model' {
+        (Remove-ManufacturerPrefix -Manufacturer 'Crucial' -Model 'Crucial') | Should Be 'Crucial'
+    }
+}
+
+Describe 'Remove-CpuMarketingSuffix' {
+    It 'strips a "<n>-Core Processor" suffix' {
+        (Remove-CpuMarketingSuffix -Model 'Ryzen 7 9800X3D 8-Core Processor') | Should Be 'Ryzen 7 9800X3D'
+    }
+    It 'strips a bare "Processor" suffix' {
+        (Remove-CpuMarketingSuffix -Model 'Core i9-14900K Processor') | Should Be 'Core i9-14900K'
+    }
+    It 'leaves a model with no marketing suffix untouched' {
+        (Remove-CpuMarketingSuffix -Model 'Ryzen 7 9800X3D') | Should Be 'Ryzen 7 9800X3D'
+    }
+}
+
+Describe 'CPU model pipeline (Remove-ManufacturerPrefix + Remove-CpuMarketingSuffix)' {
+    It 'reduces the real MOONPC CPU name to PCPartPicker-style naming' {
+        $model = Remove-ManufacturerPrefix -Manufacturer 'AMD' -Model 'AMD Ryzen 7 9800X3D 8-Core Processor'
+        $model = Remove-CpuMarketingSuffix -Model $model
+        $model | Should Be 'Ryzen 7 9800X3D'
+    }
+}
+
 Describe 'Split-VideoName' {
     It 'splits an AMD iGPU name and strips (TM)' {
         $r = Split-VideoName 'AMD Radeon(TM) Graphics'

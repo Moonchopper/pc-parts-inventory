@@ -8,6 +8,19 @@
 
 Set-StrictMode -Version 2.0
 
+function Write-ScanLibWarning {
+    <#
+        .SYNOPSIS
+        Writes "WARNING: <message>" to the real stderr. A separate copy of scan.ps1's
+        Write-ScanWarning so ScanLib.ps1 stays independently dot-sourceable (by the Pester
+        tests) with no dependency on scan.ps1. Write-Warning itself is avoided because
+        Windows PowerShell's console host renders the Warning stream to stdout when run
+        non-interactively via `-File`, which would corrupt scan.ps1's JSON output.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Message)
+    [Console]::Error.WriteLine("WARNING: $Message")
+}
+
 function Clean-String {
     <#
         .SYNOPSIS
@@ -121,6 +134,83 @@ function Clean-Manufacturer {
     return $s
 }
 
+function Remove-ManufacturerPrefix {
+    <#
+        .SYNOPSIS
+        Drops a leading manufacturer token from a model string, case-insensitively, so
+        `model` never repeats `manufacturer` (e.g. "BenQ" / "BenQ XL2430T" -> "XL2430T").
+        Used by cpu, gpu (via Split-VideoName), monitor, motherboard and storage so there is
+        one shared rule instead of a per-category one-off.
+
+        Never returns an empty model: if the manufacturer IS the whole model (or stripping it
+        would otherwise leave nothing), the original model is kept and a warning is written to
+        stderr — this only fires in that genuinely-nothing-left case, not on every non-match.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$Manufacturer,
+
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$Model
+    )
+    $cleanModel = Clean-String $Model
+    $cleanManufacturer = Clean-String $Manufacturer
+
+    if ([string]::IsNullOrWhiteSpace($cleanModel)) { return $cleanModel }
+    if ([string]::IsNullOrWhiteSpace($cleanManufacturer)) { return $cleanModel }
+
+    $prefixPattern = '^' + [regex]::Escape($cleanManufacturer) + '\b\s*'
+    if ($cleanModel -match $prefixPattern) {
+        # -replace (not [regex]::Replace) is deliberate: it is case-insensitive by default,
+        # matching the -match check above, so "GIGABYTE" strips "Gigabyte B650 EAGLE AX" too.
+        $stripped = Clean-String ($cleanModel -replace $prefixPattern, '')
+        if ($stripped -ne '') { return $stripped }
+        Write-ScanLibWarning "Remove-ManufacturerPrefix: stripping manufacturer '$cleanManufacturer' from model '$cleanModel' would leave it empty - keeping the original model"
+    }
+
+    return $cleanModel
+}
+
+# Trailing CPU marketing noise to strip once the manufacturer prefix is gone, e.g.
+# "Ryzen 7 9800X3D 8-Core Processor" -> "Ryzen 7 9800X3D" (PCPartPicker's naming, intake
+# pillar 3). Order matters: the core-count phrasings are tried before the bare "Processor"/
+# "CPU" fallback so "8-Core Processor" is removed as one unit rather than leaving "8-Core".
+$script:CpuMarketingSuffixPatterns = @(
+    '\s*[0-9]+-Core\s+Processor$',
+    '\s*[0-9]+\s+Core\s+Processor$',
+    '\s*Processor$',
+    '\s*CPU$'
+)
+
+function Remove-CpuMarketingSuffix {
+    <#
+        .SYNOPSIS
+        Strips a trailing "<n>-Core Processor" / "<n> Core Processor" / "Processor" / "CPU"
+        marketing suffix from a CPU model (case-insensitive), then re-collapses whitespace.
+        Never returns an empty model: if stripping would leave nothing, the original is kept
+        and a warning is written to stderr.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$Model
+    )
+    $s = Clean-String $Model
+    if ([string]::IsNullOrWhiteSpace($s)) { return $s }
+
+    foreach ($pattern in $script:CpuMarketingSuffixPatterns) {
+        if ($s -match $pattern) {
+            $stripped = Clean-String ($s -replace $pattern, '')
+            if ($stripped -ne '') { return $stripped }
+            Write-ScanLibWarning "Remove-CpuMarketingSuffix: stripping a marketing suffix from '$s' would leave it empty - keeping the original"
+            return $s
+        }
+    }
+    return $s
+}
+
 # Known vendor prefixes for Win32_VideoController.Name. Order matters: longer/more specific
 # tokens first where there could be ambiguity.
 $script:VideoVendorPrefixes = @('NVIDIA', 'AMD', 'Intel', 'ATI', 'Matrox')
@@ -130,8 +220,9 @@ function Split-VideoName {
         .SYNOPSIS
         Splits a Win32_VideoController.Name (e.g. "AMD Radeon(TM) Graphics",
         "NVIDIA GeForce RTX 4070 Ti SUPER") into { Manufacturer, Model }.
-        Strips (R)/(TM)/™/® marks first. Falls back to the first word as manufacturer when
-        no known vendor prefix matches.
+        Strips (R)/(TM)/™/® marks first, then shares Remove-ManufacturerPrefix with every
+        other category so there is one rule for "don't repeat the manufacturer in the model".
+        Falls back to the first word as manufacturer when no known vendor prefix matches.
     #>
     param(
         [Parameter(Mandatory = $false)]
@@ -145,9 +236,8 @@ function Split-VideoName {
 
     foreach ($vendor in $script:VideoVendorPrefixes) {
         if ($clean -match ('^' + [regex]::Escape($vendor) + '\b')) {
-            $rest = Clean-String $clean.Substring($vendor.Length)
-            if ($rest -eq '') { $rest = $vendor }
-            return [PSCustomObject]@{ Manufacturer = $vendor; Model = $rest }
+            $model = Remove-ManufacturerPrefix -Manufacturer $vendor -Model $clean
+            return [PSCustomObject]@{ Manufacturer = $vendor; Model = $model }
         }
     }
 

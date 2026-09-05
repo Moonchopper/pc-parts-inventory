@@ -7,13 +7,13 @@
                 },
     "host":  {
                  "hostname":  "MOONPC",
-                 "scannedAt":  "2026-09-05T15:32:42.9463228Z"
+                 "scannedAt":  "2026-09-05T15:42:55.5347730Z"
              },
     "components":  [
                        {
                            "category":  "cpu",
                            "manufacturer":  "AMD",
-                           "model":  "AMD Ryzen 7 9800X3D 8-Core Processor",
+                           "model":  "Ryzen 7 9800X3D",
                            "serial":  null,
                            "quantity":  1,
                            "specs":  {
@@ -123,7 +123,7 @@
                        {
                            "category":  "monitor",
                            "manufacturer":  "BenQ",
-                           "model":  "BenQ XL2430T",
+                           "model":  "XL2430T",
                            "serial":  "12a6ea782bf6",
                            "quantity":  1,
                            "specs":  {

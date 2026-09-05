@@ -121,6 +121,16 @@ function Invoke-SelfTest {
     Test-Eq (Clean-Manufacturer 'Acme Corporation') 'Acme' 'Clean-Manufacturer strips "Corporation"'
     Test-Eq (Clean-Manufacturer 'Acme Corp.') 'Acme' 'Clean-Manufacturer strips "Corp."'
     Test-Eq (Clean-Manufacturer 'Acme Inc.') 'Acme' 'Clean-Manufacturer strips "Inc."'
+    Test-Eq (Remove-ManufacturerPrefix -Manufacturer 'BenQ' -Model 'BenQ XL2430T') 'XL2430T' 'Remove-ManufacturerPrefix strips a matching prefix (BenQ)'
+    Test-Eq (Remove-ManufacturerPrefix -Manufacturer 'Acer' -Model 'ED323QUR A') 'ED323QUR A' 'Remove-ManufacturerPrefix leaves a non-matching model untouched (Acer)'
+    Test-Eq (Remove-ManufacturerPrefix -Manufacturer 'GIGABYTE' -Model 'Gigabyte B650 EAGLE AX') 'B650 EAGLE AX' 'Remove-ManufacturerPrefix matches case-insensitively (GIGABYTE vs Gigabyte)'
+    Test-Eq (Remove-ManufacturerPrefix -Manufacturer 'Crucial' -Model 'Crucial') 'Crucial' 'Remove-ManufacturerPrefix never returns an empty model'
+    Test-Eq (Remove-CpuMarketingSuffix -Model 'Ryzen 7 9800X3D 8-Core Processor') 'Ryzen 7 9800X3D' 'Remove-CpuMarketingSuffix strips "<n>-Core Processor"'
+    Test-Eq (Remove-CpuMarketingSuffix -Model 'Ryzen 7 9800X3D') 'Ryzen 7 9800X3D' 'Remove-CpuMarketingSuffix leaves a model with no suffix untouched'
+    $cpuPipelineModel = Remove-ManufacturerPrefix -Manufacturer 'AMD' -Model 'AMD Ryzen 7 9800X3D 8-Core Processor'
+    $cpuPipelineModel = Remove-CpuMarketingSuffix -Model $cpuPipelineModel
+    Test-Eq $cpuPipelineModel 'Ryzen 7 9800X3D' 'CPU model pipeline reduces the real MOONPC CPU name to PCPartPicker-style naming'
+
     $splitAmd = Split-VideoName 'AMD Radeon(TM) Graphics'
     Test-Eq $splitAmd.Manufacturer 'AMD' 'Split-VideoName strips "(TM)" and identifies manufacturer'
     Test-Eq $splitAmd.Model 'Radeon Graphics' 'Split-VideoName strips "(TM)" from model'
@@ -219,10 +229,16 @@ function Get-CpuComponentList {
         $socket = Clean-String $cpu.SocketDesignation
         if ($socket) { $specs['socket'] = $socket }
 
+        # PCPartPicker-style naming (intake pillar 3): "AMD Ryzen 7 9800X3D 8-Core Processor"
+        # -> drop the leading manufacturer, then the trailing "<n>-Core Processor" marketing
+        # noise -> "Ryzen 7 9800X3D".
+        $model = Remove-ManufacturerPrefix -Manufacturer $manufacturer -Model (Clean-String $cpu.Name)
+        $model = Remove-CpuMarketingSuffix -Model $model
+
         $result += [ordered]@{
             category     = 'cpu'
             manufacturer = $manufacturer
-            model        = Clean-String $cpu.Name
+            model        = $model
             serial       = Clean-Serial $cpu.SerialNumber
             quantity     = 1
             specs        = $specs
@@ -362,6 +378,7 @@ function Get-StorageComponentList {
 
         $model = Clean-String $disk.Model
         if ([string]::IsNullOrWhiteSpace($model)) { $model = Clean-String $disk.FriendlyName }
+        $model = Remove-ManufacturerPrefix -Manufacturer $manufacturer -Model $model
 
         $specs = [ordered]@{}
         if ($null -ne $disk.Size) { $specs['capacityBytes'] = [int64]$disk.Size }
@@ -409,10 +426,13 @@ function Get-MotherboardComponentList {
         if ($biosVersion) { $specs['biosVersion'] = $biosVersion }
     }
 
+    $motherboardManufacturer = Clean-Manufacturer $baseboard.Manufacturer
+    $motherboardModel = Remove-ManufacturerPrefix -Manufacturer $motherboardManufacturer -Model (Clean-String $baseboard.Product)
+
     $result += [ordered]@{
         category     = 'motherboard'
-        manufacturer = Clean-Manufacturer $baseboard.Manufacturer
-        model        = Clean-String $baseboard.Product
+        manufacturer = $motherboardManufacturer
+        model        = $motherboardModel
         serial       = Clean-Serial $baseboard.SerialNumber
         quantity     = 1
         specs        = $specs
@@ -436,6 +456,7 @@ function Get-MonitorComponentList {
         if ([string]::IsNullOrWhiteSpace($model)) {
             $model = Clean-String (ConvertFrom-Uint16Array $mon.ProductCodeID)
         }
+        $model = Remove-ManufacturerPrefix -Manufacturer $manufacturer -Model $model
 
         $serial = Clean-Serial (ConvertFrom-Uint16Array $mon.SerialNumberID)
 
