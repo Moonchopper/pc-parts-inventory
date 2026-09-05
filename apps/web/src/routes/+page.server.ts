@@ -6,6 +6,7 @@ import {
   listBuilds,
   listParts,
   patchPart,
+  rethrowApiUnreachable,
 } from '$lib/server/api.js';
 import type { Actions, PageServerLoad } from './$types.js';
 
@@ -20,10 +21,16 @@ import type { Actions, PageServerLoad } from './$types.js';
  * lookup per part instead of a request each.
  */
 export const load: PageServerLoad = async () => {
-  const [parts, builds] = await Promise.all([listParts(), listBuilds()]);
-  const valuations = await Promise.all(builds.map((build) => getValuation(build.id)));
-  const pricing = indexValuationsByPart(valuations);
-  return { parts, pricing };
+  try {
+    const [parts, builds] = await Promise.all([listParts(), listBuilds()]);
+    const valuations = await Promise.all(builds.map((build) => getValuation(build.id)));
+    const pricing = indexValuationsByPart(valuations);
+    return { parts, pricing };
+  } catch (err) {
+    // F2 — same rule as the share page: an unreachable API 503s through `+error.svelte` instead of
+    // hanging or crashing.
+    rethrowApiUnreachable(err);
+  }
 };
 
 function messageFor(err: unknown, fallback: string): string {

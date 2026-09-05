@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { categoryLabel } from '@pcpi/contracts';
   import { formatMoney, formatSignedMoney } from '$lib/money.js';
   import type { ActionData, PageData } from './$types.js';
 
@@ -35,7 +36,7 @@
       {#each data.parts as part (part.id)}
         {@const priced = data.pricing[part.id]}
         <tr>
-          <td>{part.product?.category ?? '—'}</td>
+          <td>{part.product ? categoryLabel(part.product.category) : '—'}</td>
           <td>{part.product ? `${part.product.manufacturer} ${part.product.model}` : '—'}</td>
           <td>{part.serial ?? '—'}</td>
           <td>{part.condition}</td>
