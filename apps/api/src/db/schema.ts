@@ -176,8 +176,15 @@ export const priceQuotes = sqliteTable(
   (t) => [index('price_quotes_product_observed_idx').on(t.productId, t.observedAt)],
 );
 
+// D3 correction (architect-directed, brief "PM addendum 2"): §3 originally omitted `ownerId` on
+// `jobs`, contradicting D3's "every root table" rule. Every enqueued job carries the owner of the
+// thing it acts on (for `price_refresh`, the product's `ownerId`); the runner does NOT filter by
+// owner in M0 (D3 v1 has exactly one owner) — the column exists so multi-tenancy stays additive.
 export const jobs = sqliteTable('jobs', {
   id: text('id').primaryKey(),
+  ownerId: text('owner_id')
+    .notNull()
+    .references(() => owners.id),
   kind: text('kind').notNull(),
   runAt: text('run_at').notNull(),
   status: text('status', { enum: JOB_STATUSES }).notNull().default('queued'),

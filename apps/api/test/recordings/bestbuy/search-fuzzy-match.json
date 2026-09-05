@@ -1,0 +1,22 @@
+{
+  "from": 1,
+  "to": 1,
+  "currentPage": 1,
+  "total": 1,
+  "totalPages": 1,
+  "queryTime": "0.010",
+  "totalTime": "0.038",
+  "partial": false,
+  "products": [
+    {
+      "sku": 6612345,
+      "name": "Crucial - T700 2TB Internal SSD PCIe Gen 5 x4 NVMe",
+      "salePrice": 189.99,
+      "regularPrice": 219.99,
+      "manufacturer": "Crucial",
+      "modelNumber": "CT2000T700SSD3",
+      "upc": "649528909012",
+      "url": "https://www.bestbuy.com/site/crucial-t700-2tb/6612345.p"
+    }
+  ]
+}
