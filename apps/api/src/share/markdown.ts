@@ -1,6 +1,5 @@
 import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
-import { valuationCaption } from '@pcpi/contracts';
-import { categoryLabel } from './category-labels.js';
+import { categoryLabel, valuationCaption } from '@pcpi/contracts';
 import { itemDisplayName } from './item-name.js';
 import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
 import { escapeMarkdownCell } from './text.js';
