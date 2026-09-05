@@ -1,0 +1,86 @@
+# syntax=docker/dockerfile:1.7
+#
+# apps/web — SvelteKit (SSR), `adapter-node`. Built from the repo root:
+# `docker build -f docker/Dockerfile.web .` (compose.yaml does this).
+#
+# Same two-stage shape as Dockerfile.api. No native compiled dependency lives in this image's
+# dependency tree — better-sqlite3 belongs to @pcpi/api and this Dockerfile's filtered install
+# never resolves it (verified: `pnpm install --filter @pcpi/web... --frozen-lockfile` in a tree
+# without apps/api pulls zero copies of better-sqlite3) — so, per Recon's "don't add a compiler
+# toolchain just in case", this builder gets no C/C++ toolchain at all.
+
+# ---------------------------------------------------------------------------------------------
+# Builder
+# ---------------------------------------------------------------------------------------------
+FROM node:22.14.0-slim AS builder
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    CI=true \
+    PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH
+RUN corepack enable
+
+WORKDIR /app
+
+# --- Manifests first: installs stay cached across source-only changes --------------------------
+# Deliberately NOT copying the root tsconfig.json (the project-reference aggregator listing
+# packages/core, apps/api and tools/harness, none of which this image checks out): Vite's tsconfig
+# resolution walks up from apps/web looking for the nearest tsconfig.json and errors on references
+# it can't find on disk. Every package's own tsconfig extends only tsconfig.base.json, which is
+# copied below and is all `tsc -b`/Vite need.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc tsconfig.base.json ./
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY apps/web/package.json apps/web/package.json
+
+# `@pcpi/web...` = the target plus everything it depends on (contracts only) — never apps/api,
+# packages/core or tools/*, so better-sqlite3 is never in scope for this install.
+RUN --mount=type=cache,id=pcpi-pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --filter @pcpi/web... --frozen-lockfile
+
+# --- Real source, then build just what the web app needs ---------------------------------------
+COPY packages/contracts packages/contracts
+COPY apps/web apps/web
+
+RUN pnpm --filter @pcpi/web... build
+
+# --- Pruned production install ------------------------------------------------------------------
+# `adapter-node`'s build output is a self-contained Rollup bundle for everything first-party, but
+# a handful of adapter runtime deps (polka, sirv, cookie, set-cookie-parser, @opentelemetry/api's
+# optional hook) are real npm dependencies of @sveltejs/kit/adapter-node and still need to resolve
+# from node_modules at runtime — this keeps them (as production deps) and drops
+# vite/svelte-check/typescript etc. `CI=true` (set above) is what lets this rerun non-interactively
+# (see Dockerfile.api for the ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY note).
+RUN --mount=type=cache,id=pcpi-pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --filter @pcpi/web... --frozen-lockfile --prod
+
+# ---------------------------------------------------------------------------------------------
+# Runtime
+# ---------------------------------------------------------------------------------------------
+FROM node:22.14.0-slim AS runtime
+
+ENV NODE_ENV=production \
+    PORT=3001 \
+    HOST=0.0.0.0
+
+WORKDIR /app
+
+RUN groupadd --system pcpi \
+    && useradd --system --gid pcpi --home-dir /app --shell /usr/sbin/nologin pcpi \
+    && chown -R pcpi:pcpi /app
+
+# See Dockerfile.api: copying the whole builder /app in one shot keeps pnpm's per-package
+# node_modules symlinks (relative paths into the root node_modules/.pnpm store) valid.
+COPY --from=builder --chown=pcpi:pcpi /app /app
+
+USER pcpi
+EXPOSE 3001
+
+# `/` (inventory) round-trips to the API (apps/web/src/routes/+page.server.ts: listParts()), so a
+# 200/4xx both prove the Node process and its API_URL wiring are alive; only a 5xx/connection
+# failure should flip the container unhealthy.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "apps/web/build/index.js"]

@@ -1,0 +1,44 @@
+# W0.6 — kept out of every image's build context. "Getting node_modules out is not optional" (brief
+# Recon): a host node_modules can carry a Windows-built better-sqlite3/.node or the wrong
+# @resvg/resvg-js optional dependency, and COPYing it into a Linux image is the classic way to ship
+# a binary the container can't load. Every install in the Dockerfiles runs `pnpm install` fresh,
+# inside the image, against the platform it's actually building for.
+node_modules
+**/node_modules
+
+# VCS / editor / OS noise.
+.git
+.gitignore
+.vs
+.idea
+
+# Build outputs and caches — regenerated inside the image by each Dockerfile's own `pnpm build`.
+# Leaving a host-built copy in the context risks a stale/host-platform artifact silently riding
+# along a COPY of its parent directory instead of the fresh one the container build produces.
+dist
+**/dist
+build
+apps/web/build
+.svelte-kit
+**/.svelte-kit
+*.tsbuildinfo
+**/*.tsbuildinfo
+coverage
+**/coverage
+
+# Local runtime state and secrets — never belongs in an image.
+artifacts
+*.db
+*.db-*
+.env
+.env.*
+data
+**/data
+
+# Sibling worktrees the brief calls out explicitly (not reachable from this build context anyway,
+# since Docker can't COPY outside it, but excluded defensively in case the context root ever moves).
+pc-parts-inventory-wt
+
+# Not needed inside either image.
+docs
+.claude

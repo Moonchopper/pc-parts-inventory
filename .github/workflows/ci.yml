@@ -1,0 +1,81 @@
+# M0 W0.6 (D14) — "first green CI is part of M0's done-definition." Matrix runs the CLAUDE.md gate
+# order (install -> build -> typecheck -> lint -> test -> harness) on ubuntu-latest and
+# windows-latest, then a separate ubuntu-only job proves the compose images still build.
+#
+# No secret is added here: BESTBUY_API_KEY stays unset, so the bestbuy pricing provider reports
+# `configured: false` (Non-goals) rather than attempting a live network call.
+name: CI
+
+on:
+  push:
+    branches: [feat/**]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: gates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm before setup-node: setup-node's `cache: pnpm` shells out to `pnpm store path` to find
+      # what to cache, so pnpm has to be on PATH first. Version comes from package.json's
+      # `packageManager` field (pnpm@11.25.0) — no version pin duplicated here.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # CLAUDE.md § Commands gate order, exactly.
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: build
+        run: pnpm build
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      - name: lint
+        run: pnpm lint
+
+      - name: test
+        run: pnpm test
+
+      - name: harness
+        run: pnpm harness --name ci-${{ matrix.os }}
+
+      # `if: always()` — the report.json/card.png/share.html are the evidence whether the harness
+      # passed or failed (D14); a failed run is exactly when they're needed most.
+      - name: upload harness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-${{ matrix.os }}
+          path: artifacts/harness/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  docker-build:
+    name: docker compose build (ubuntu-latest, build only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: docker compose build
+        env:
+          DOCKER_BUILDKIT: "1"
+          COMPOSE_DOCKER_CLI_BUILD: "1"
+        run: docker compose build
