@@ -173,10 +173,21 @@ Goal: `tools/scanner/scan.ps1` emits a valid ScanPayload for a Windows machine.
 
 ## 7. Integration gate (PM runs after W0.6 on `feat/m0-seed`)
 
-`pnpm harness --name m0` with the **real redacted scan** (D15) → `artifacts/harness/m0/report.json` must show:
-`importsIdempotent: true`, `productsCreated ≥ 5`, `partsCreated ≥ 6`, `buildsCreated: 1`, `quotesRecorded ≥ 2`,
-`valuation.currentCents > 0`, `share.html.ogTags: 4`, `share.md.rows == items`, `card.png.bytes > 10000`. The PM reads
-`card.png` and `share.html` and quotes what it saw. Then `docker compose up --build` + `curl` the share page.
+`pnpm harness --name m0 --fixture tools/scanner/fixtures/<hostname>.redacted.json` with the **real redacted scan**
+(D15) → `artifacts/harness/m0/report.json` must show: `importsIdempotent: true`, `productsCreated ≥ 5`,
+`partsCreated ≥ 6`, `buildsCreated: 1`, `quotesRecorded ≥ 2`, `share.html.ogTags: 4`, `share.md.rows == items`,
+`card.png.bytes > 10000`. The PM reads `card.png` and `share.html` and quotes what it saw. Then
+`docker compose up --build` + `curl` the share page.
+
+**The gate reads money from the artifacts, never from the endpoint** (revised 2026-09-05 — architect; the original
+asserted `valuation.currentCents > 0` against `GET /builds/{id}/valuation` and so passed while every user-visible
+artifact rendered em-dashes). Before the share fetches, the harness `PATCH`es `acquiredPriceCents` onto **≥ 2 parts**
+of the imported build, with values from `packages/contracts/fixtures/cost-basis.json` keyed by `identityKey`
+(fewer than 2 matches fails the check). It then asserts, from the share payload and exports:
+`share.json.valuation.acquiredCents > 0`, `share.json.valuation.currentCents > 0`,
+`share.json.valuation.deltaCents != 0`, `share.md` contains **at least two non-dash prices and a totals line**, and
+`share.json.items` is **identical across two runs** (the item-order rule above). **`card.png` must show a total, not
+"Valuation not available yet"** — that image is this milestone's outcome sentence, paid-vs-now, proven end to end.
 
 ## 8. Manual test guide (PM writes `docs/process/test-guides/m0.md`)
 

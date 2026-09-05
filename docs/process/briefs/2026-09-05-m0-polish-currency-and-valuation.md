@@ -174,3 +174,63 @@ just same-length. A test that only checks the first element is not sufficient.
 unchanged — in particular `apps/api/src/pricing/**` and `apps/api/src/jobs/**` remain read-only.
 
 `docs/milestones/M0-seed.md` §4 records this rule under `SharedBuild`.
+
+---
+
+## Task 4 — populate the share valuation (architect-directed; this is the milestone's headline outcome)
+
+**The bug.** `apps/api/src/share/service.ts` contains **zero** references to `valuation` or `currentCents`. The
+§4 fields exist and nothing fills them, so the share page, the Markdown and the PNG all render `—` and
+"Valuation not available yet" — **while `GET /builds/{id}/valuation` returns 167896 cents in the very same
+harness run.** No brief owned this: W0.1 built the share route before valuation existed, W0.3 built valuation but
+did not own the share route, and W0.5 faithfully rendered fields nobody populates. Playbook learning 15 exactly.
+
+**The fix.** Populate it **once, in the API share route**, from **the same code path `GET /builds/{id}/valuation`
+uses — call the service function directly, never the HTTP endpoint.** Then:
+- `SharedBuild.valuation` carries `acquiredCents`, `currentCents`, `deltaCents`.
+- each `items[].currentCents` comes from that product's chosen quote (D5 precedence, resolved server-side).
+- the Markdown totals rows and the PNG's delta line light up automatically — **do not touch the renderers'
+  formatting logic**; they already handle the populated case. If they do not, that is the bug to fix, not a reason
+  to reformat.
+
+## Task 5 — wire the web to the endpoints that now exist (depends on `m0-crud-endpoints`)
+
+`m0-crud-endpoints` merges **before** this brief and ships the nine missing §5 endpoints. Two consequences:
+1. **`apps/web/src/routes/builds/[id]/+page.server.ts`'s `addItem`/`removeItem` form actions currently 502**,
+   because `POST /builds/{id}/items` and `DELETE /builds/{id}/items/{partId}` did not exist when W0.4 wrote them.
+   They exist now. Verify both work end to end and fix whatever does not — including surfacing the **409**
+   (part already in another build) as a readable message rather than a generic 502.
+2. **Add an inline "acquired price" edit to the inventory row** — a form action posting to `PATCH /parts/{id}`
+   with `acquiredPriceCents`. No JS required (plain `<form method="POST">`), integer minor units on the wire, and
+   the valuation figures must change on the next load. This is the §8 manual-test step that is currently
+   impossible to perform.
+
+## Task 6 — make the §7 gate read money from the artifacts, not the endpoint (architect-directed)
+
+The old gate asserted `valuation.currentCents > 0` from the **valuation endpoint**, so it went green while every
+user-visible artifact showed em-dashes. `docs/milestones/M0-seed.md` §7 is updated; implement it in
+`tools/harness/checks/**` (**added to your Scope for this task**):
+
+- Before the share fetches, the harness **`PATCH`es `acquiredPriceCents` onto ≥ 2 parts** of the imported build.
+  Values come from a new fixture, **`packages/contracts/fixtures/cost-basis.json`, keyed by `identityKey`** so it
+  works for both the sample and the real MOONPC scan. Skip keys that are not in the current fixture; **fail the
+  check if fewer than 2 matched**, so a silently-empty cost basis can never pass.
+- Then assert, from the **artifacts**:
+  - `share.json.valuation.acquiredCents > 0`
+  - `share.json.valuation.currentCents > 0`
+  - `share.json.valuation.deltaCents != 0`
+  - `share.md` contains **at least two non-dash prices and a totals line**
+  - `share.json.items` is **identical across two runs** (the Task 3 ordering rule — deep-equal, not same-length)
+- Write the new figures into `report.json` counters (`valuation.*` already exists — fill it from the share
+  payload now, not the endpoint).
+
+**The PNG must show a total, not "Valuation not available yet"** — the PM reads it and will reject a card that
+still says that. That image is the M0 outcome sentence, paid-vs-now, proven end to end.
+
+**Scope addition for Tasks 4–6:** `apps/api/src/share/**`, `apps/web/src/routes/**` (already in Scope),
+`tools/harness/checks/**`, and `packages/contracts/fixtures/cost-basis.json`. Still **no** changes to
+`packages/core` valuation logic, `apps/api/src/pricing/**`, `apps/api/src/jobs/**`, or anything W0.6 owns
+(`docker/**`, `compose.yaml`, `.github/**`).
+
+**Sequencing:** this brief is cut from `feat/m0-seed` **after `m0-crud-endpoints` is merged**. It may run in
+parallel with W0.6 (disjoint scopes). The §7 re-run happens after both land.
