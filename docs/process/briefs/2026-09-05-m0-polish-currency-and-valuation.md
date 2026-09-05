@@ -336,3 +336,58 @@ web :5173) instead and **say which you used** — do not skip it, and do not cla
 **Scope addition:** `apps/web/src/routes/api/**` (or wherever the proxy route lives) — already inside your
 `apps/web/src/**` Scope. Do not touch `docker/**`, `compose.yaml` or `.github/**`; W0.6 is merged and those files
 are correct as they stand.
+
+---
+
+## CONTINUATION (2026-09-05) — inherit the WIP, do not restart
+
+The first implementer on this brief was **killed mid-run by the account session limit (HTTP 429)**, at the step
+"check for leftover TODOs and review the full diff before committing". Its work was never committed. The PM has
+checkpointed it:
+
+```
+worktree: d:\pc-parts-inventory-wt\polish-currency-valuation
+branch:   feat/m0-polish-currency-valuation
+checkpoint: a02483f   (base: 2d3cb56)
+```
+
+**`a02483f` is unverified. No gate has run on it — not build, not typecheck, not lint, not test, not harness.
+It may not compile.** It is a recovery point, not an accepted state, and nothing in it has been reviewed.
+
+### Your first three commands, before you write anything
+```bash
+cd d:/pc-parts-inventory-wt/polish-currency-valuation
+git diff 2d3cb56..HEAD --stat     # ~27 modified + 10 new, ~1014 insertions / 244 deletions
+git diff 2d3cb56..HEAD            # read it — this is the state you are inheriting
+```
+**Do not restart from scratch. Do not revert the checkpoint.** Read what is there, then finish it.
+
+### What the checkpoint appears to contain (verify against the diff — the PM has not validated any of it)
+| Task | Files that look touched |
+|---|---|
+| 1 currency | `packages/contracts/src/domain.ts`, `apps/api/src/share/{service,money}.ts`, `apps/web/src/lib/money.ts` |
+| 2 inventory current/delta | `apps/web/src/lib/inventory-pricing.ts` (new) + test, `routes/+page.server.ts`, `+page.svelte` |
+| 3 item order | `packages/contracts/src/category.ts` + `test/category.test.ts` (new), `apps/api/src/builds/routes.ts` |
+| 4 share valuation | `apps/api/src/share/service.ts`, `apps/api/src/builds/valuation.ts` (new) |
+| 5 web ↔ CRUD | `apps/web/src/routes/builds/[id]/+page.server.ts`, `+page.svelte` |
+| 6 harness gate | `packages/contracts/fixtures/cost-basis.json` (new), `tools/harness/checks/{30-pricing,35-cost-basis,65-valuation-artifacts}.ts` |
+| 7 D5 fallback | `packages/core/src/valuate.ts` + `test/valuate.test.ts` |
+| 8 share proxy | `apps/web/src/lib/server/share-proxy.ts` + `routes/api/v1/share/**` (new); the old `b/[slug]/markdown/+server.ts` is **deleted** |
+
+### Then
+1. `pnpm install && pnpm build && pnpm typecheck && pnpm lint && pnpm test` — **expect red**; fix what is red.
+2. `pnpm harness --name w07` and `pnpm harness --name w07-real --fixture tools/scanner/fixtures/MOONPC.redacted.json`.
+3. Finish whatever Tasks 1–8 the diff shows incomplete. **Check these four specifically — they are the ones most
+   likely to be half-done or subtly wrong:**
+   - **Task 8:** the proxy must **stream** the upstream body. If it uses `.text()` anywhere, the PNG is corrupted —
+     the deleted markdown proxy used `.text()`, which was fine for Markdown and is wrong here. `ETag`/`304`/
+     `Content-Type` must survive, and the upstream status must pass through (a `private` build stays 404).
+     Confirm the `.md` path is actually routed, not just the JSON and `card.png` ones.
+   - **Task 6:** `cost-basis.json` values must **differ from the fixture quotes** so `comparable.deltaCents != 0`
+     is provably nonzero rather than accidentally so; the check must **fail when fewer than 2 keys match**.
+   - **Task 7:** the rewritten `valuate` test must assert the new shape — the old `{ acquiredCents: 5000,
+     quotes: [] }` case now yields `currentCents 8000`, `comparable.items 1`, `coverage.withAcquired 2`,
+     `coverage.withCurrent 1`. No fallback in either direction.
+   - **Δ rendering:** `—` when `comparable.items == 0`, never `0` and never `+0.0%`.
+4. Then the brief's normal **Acceptance**, **Done definition** and the §9 report. Commit properly on top of the
+   checkpoint (do not amend it — it is the recovery point).
