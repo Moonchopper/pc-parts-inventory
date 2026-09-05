@@ -157,3 +157,30 @@ a test can only go green by weakening it; a toolchain failure survives one retry
 ## Done definition
 Playbook §9 report with real output tails per gate, `artifacts/harness/w03/report.json` counters quoted, no TODOs,
 gate tails in the final commit message, work only on `feat/m0-pricing-and-jobs`, doc deltas in `Follow-ups`.
+
+---
+
+## PM addendum (2026-09-05, after validating and merging W0.1 — read this, it is not optional)
+
+The seed is merged. Three clarifications so you never need to touch `apps/api/src/app.ts`:
+
+1. **Route module → mount point, as W0.1 actually built it.** `app.ts` mounts eight modules under `/api/v1`:
+   `health`, `imports`, `builds`, `parts`, `products`, `share`, **`pricing/routes.ts` at `/providers`**, and
+   **`jobs/routes.ts` at `/jobs`**. So:
+   - `GET /providers` goes in `apps/api/src/pricing/routes.ts` (it is already mounted at that path).
+   - `POST /jobs/run-due` goes in `apps/api/src/jobs/routes.ts`.
+   - **The product-scoped pricing endpoints are NOT served from the pricing module.**
+     `GET /products/{id}/quotes`, `POST /products/{id}/refresh` and the `…/links` routes go in
+     `apps/api/src/products/routes.ts`; `GET /builds/{id}/valuation` goes in `apps/api/src/builds/routes.ts`.
+     Both files are in your Scope as **add-only**. The contract is the §5 path, not the module layout.
+   - Non-route pricing code (the provider registry, the fixture/bestbuy providers' API-side wiring) can live in
+     other files under `apps/api/src/pricing/` — only the *router* file is mount-bound.
+2. **Import `z` from `packages/contracts/src/z.ts` (re-exported by the package index), never from `zod`.**
+   `@hono/zod-openapi` decorates `z` with `.openapi()`; a bare `zod` import silently loses that metadata and your
+   routes will be missing from the spec. See `CLAUDE.md` § Framework notes.
+3. **The real scan is now on the wave branch**: `tools/scanner/fixtures/MOONPC.redacted.json`, 10 components →
+   **9 products / 10 parts**. Verified by the PM through the booted API. Key your `fixtures/quotes.json` off what
+   is really in there — the exact strings are: `AMD`/`Ryzen 7 9800X3D`, `NVIDIA`/`GeForce RTX 4070 Ti SUPER`,
+   `AMD`/`Radeon Graphics`, `G.SKILL`/`F5-6000J3036G32G` (partNumber `F5-6000J3036G32G`),
+   `Crucial`/`CT2000T700SSD5`, `Gigabyte`/`B650 EAGLE AX`, `Dell`/`AW3423DWF`, `Acer`/`ED323QUR A`,
+   `BenQ`/`XL2430T`. Note the models do **not** repeat the manufacturer — match on that form.

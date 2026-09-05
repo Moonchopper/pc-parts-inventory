@@ -66,9 +66,28 @@ artifacts/          gitignored evidence
 - `apps/web` imports only from `packages/contracts` and its generated client — never Drizzle, never `apps/api`.
 - Real hardware is the evidence: the harness fixture is a redacted scan of one of Austin's machines.
 
-## Framework notes (the seed brief fills these in with the pinned versions and the gotchas that matter to LLM-written code)
+## Framework notes (pinned by the M0 seed; **exact pins, no `^`/`~` anywhere** — verified by the PM 2026-09-05)
 
-- Svelte 5 runes (`$state`, `$derived`, `$props`) — not Svelte 4 `export let` / `$:` syntax.
-- Drizzle: <pinned version> — <migration command; sqlite driver used; dialect-specific notes>
-- zod: <pinned version> — <v3 or v4; import path used by `@hono/zod-openapi`>
-- Hono: <pinned version> — <OpenAPI registry pattern; error handler>
+- **TypeScript: 5.9.3 — do not bump.** `latest` is 7.0.2, but `svelte-check` wants `^5||^6`,
+  `@sveltejs/kit` `^5.3.3||^6`, and `openapi-typescript` `^5.x`. 5.9.3 is the only version satisfying all three.
+- **zod: 4.5.4 (v4).** `@hono/zod-openapi` re-exports a `z` decorated with `.openapi()`. Importing bare `zod`
+  alongside it silently drops the OpenAPI metadata — so there is exactly **one** `z`, re-exported from
+  `packages/contracts/src/z.ts`. Import it from there, never from `zod`.
+- **Hono: 4.13.7** + `@hono/zod-openapi` 1.6.3 + `@hono/node-server` 2.1.1 + `@scalar/hono-api-reference` 0.12.0.
+  Each route module owns its own `OpenAPIHono` router and registers its own routes; `apps/api/src/app.ts` mounts
+  all eight and is the only place that changes when a *new* module appears. One `onError` + one `notFound`
+  produce the `{ error: { code, message, details? } }` shape. Spec is emitted with `app.doc31()`.
+- **Drizzle: `drizzle-orm` 0.45.2 / `drizzle-kit` 0.31.10**, `better-sqlite3` 13.0.3 driver. Migrations:
+  `pnpm --filter @pcpi/api db:generate` (writes `apps/api/drizzle/`), applied on API boot. One schema file
+  (`apps/api/src/db/schema.ts`), sqlite dialect now, postgres later. In SQLite a plain unique index already
+  means "unique among non-NULL rows", so §3's `partNumber`/`upc` rules need no partial index.
+- **Svelte 5 runes** (`$state`, `$derived`, `$props`, `{@render}`) — **not** Svelte 4 `export let` / `$:` /
+  `<slot>`. Pins: svelte 5.57.0, `@sveltejs/kit` 2.70.3, adapter-node 5.5.7, vite-plugin-svelte 7.3.0 (requires
+  vite `^8` and svelte `^5.46.4`), vite 8.2.2, svelte-check 4.7.6.
+- **pnpm 11 settings live in `pnpm-workspace.yaml`**, not the `pnpm` key of `package.json` (silently ignored).
+  `allowBuilds`/`onlyBuiltDependencies` list `better-sqlite3`. That package also ships prebuilds for
+  win32/linux/linuxmusl x64+arm64, so no compiler is needed to *run* it — relevant to the container image.
+- **`better-sqlite3` is CJS** (`import Database from 'better-sqlite3'`); `nanoid` and `satori` are ESM-only.
+  Everything here is `"type": "module"`.
+- **The harness must never hard-code a port or DB path** — it binds `PORT=0`, reads the port the child reports
+  on stdout, and uses a fresh `os.tmpdir()` database, because several worktrees run it concurrently.

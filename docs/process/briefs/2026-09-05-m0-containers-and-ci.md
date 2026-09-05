@@ -151,3 +151,27 @@ Playbook §9 report with real tails per gate and per `curl`, image sizes, the co
 `card.png`, an explicit statement that CI is unverified-by-run, no TODOs, gate tails in the final commit message,
 work only on `feat/m0-containers-and-ci`, doc deltas (README run instructions, `CLAUDE.md` § Commands) in
 `Follow-ups`.
+
+---
+
+## PM addendum (2026-09-05, from validating W0.1's clean-room install)
+
+**The native-module finding that decides your Dockerfile.** The PM ran a from-scratch
+`pnpm install --frozen-lockfile` in a fresh worktree with no `node_modules`:
+
+- It **exits 0** and every gate then passes (build, typecheck, lint, 25 tests, harness). So CI will not trip the
+  pnpm 11 ignored-builds gate — `pnpm-workspace.yaml` already carries `allowBuilds`/`onlyBuiltDependencies`
+  for `better-sqlite3`.
+- **But because `better-sqlite3` is in `allowBuilds`, its install script runs and invokes node-gyp** — on this
+  Windows box it spawned MSBuild from Visual Studio Build Tools and took ~13 s of the install.
+- `better-sqlite3@13.0.3` nevertheless **ships prebuilds for `linux-x64`, `linuxmusl-x64`, `win32-x64`,
+  `darwin-*` and the arm64 variants**, and the PM separately verified the package works with its build script
+  *ignored*. A compiler is therefore not needed to **run** it — only the opt-in install script wants one.
+
+**What this means for you:** a `node:22-slim` builder has no python/make/g++. If the install script runs there it
+can fail. Decide deliberately and justify it in your report — either (a) keep `allowBuilds` and install the
+toolchain in the **builder** stage only (never the runtime stage), or (b) run the image's install with the build
+script skipped and rely on the shipped prebuild. **Do not** solve it by adding a compiler to the runtime image.
+Whichever you pick, prove it with a `docker compose build` tail and a working `/health` from the container.
+You may edit `pnpm-workspace.yaml` **only** if option (b) requires it — say so loudly in your report if you do,
+since it is otherwise outside your Scope.
