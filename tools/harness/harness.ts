@@ -21,10 +21,46 @@ type ApiChildProcess = ChildProcessByStdio<null, Readable, Readable>;
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..');
 
-function parseArgs(argv: string[]): { name: string } {
-  const idx = argv.indexOf('--name');
-  const name = idx >= 0 ? argv[idx + 1] : undefined;
-  return { name: name ?? 'default' };
+const DEFAULT_FIXTURE = join('packages', 'contracts', 'fixtures', 'scan.sample.json');
+
+function parseArgs(argv: string[]): { name: string; fixture: string } {
+  const nameIdx = argv.indexOf('--name');
+  const name = nameIdx >= 0 ? argv[nameIdx + 1] : undefined;
+  const fixtureIdx = argv.indexOf('--fixture');
+  const fixture = fixtureIdx >= 0 ? argv[fixtureIdx + 1] : undefined;
+  return { name: name ?? 'default', fixture: fixture ?? DEFAULT_FIXTURE };
+}
+
+/**
+ * `--fixture <path>` (default: the hand-written sample) — resolved relative to the repo root so a
+ * relative path works the same regardless of cwd; an absolute path passes through unchanged. Fails
+ * with a clear message (not a raw ENOENT/zod stack) if the file is missing or isn't a ScanPayload —
+ * this is what lets the PM's integration gate point the same harness at the real redacted scan
+ * (D15) without editing this file.
+ */
+function loadFixture(fixtureArg: string): ScanPayload {
+  const fixturePath = resolve(repoRoot, fixtureArg);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(fixturePath, 'utf-8'));
+  } catch (err) {
+    throw new Error(
+      `--fixture ${fixtureArg} (resolved to ${fixturePath}) could not be read/parsed as JSON: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+  const result = ScanPayload.safeParse(raw);
+  if (!result.success) {
+    throw new Error(
+      `--fixture ${fixtureArg} (resolved to ${fixturePath}) does not match the ScanPayload contract:\n${JSON.stringify(
+        result.error.flatten(),
+        null,
+        2,
+      )}`,
+    );
+  }
+  return result.data;
 }
 
 function waitForPort(child: ApiChildProcess, timeoutMs = 15_000): Promise<number> {
@@ -75,41 +111,44 @@ function waitForPort(child: ApiChildProcess, timeoutMs = 15_000): Promise<number
 }
 
 async function main(): Promise<void> {
-  const { name } = parseArgs(process.argv.slice(2));
+  const { name, fixture: fixtureArg } = parseArgs(process.argv.slice(2));
   const startedAt = new Date();
   const artifactsDir = resolve(repoRoot, 'artifacts', 'harness', name);
   rmSync(artifactsDir, { recursive: true, force: true });
   mkdirSync(artifactsDir, { recursive: true });
 
-  const tmpDbDir = mkdtempSync(join(tmpdir(), 'pcpi-harness-'));
-  const dbPath = join(tmpDbDir, 'pcpi.db');
-  const servePath = resolve(repoRoot, 'apps', 'api', 'src', 'serve.ts');
-
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    DATABASE_URL: `file:${dbPath}`,
-    PORT: '0',
-    HARNESS: '1',
-  };
-  childEnv.API_TOKEN = undefined;
-
-  const child = spawn(process.execPath, ['--import', 'tsx', servePath], {
-    cwd: repoRoot,
-    env: childEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
   const errors: string[] = [];
   const checksResults: Array<{ id: string; ok: boolean; ms: number; detail: string }> = [];
   const counters: Counters = defaultCounters();
   let ok = true;
+  let child: ApiChildProcess | undefined;
+  let tmpDbDir: string | undefined;
 
   try {
+    // Fail fast, with a clear message, before ever spawning the API — a bad --fixture shouldn't
+    // cost a 15s port-wait timeout.
+    const fixture = loadFixture(fixtureArg);
+
+    tmpDbDir = mkdtempSync(join(tmpdir(), 'pcpi-harness-'));
+    const dbPath = join(tmpDbDir, 'pcpi.db');
+    const servePath = resolve(repoRoot, 'apps', 'api', 'src', 'serve.ts');
+
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      DATABASE_URL: `file:${dbPath}`,
+      PORT: '0',
+      HARNESS: '1',
+    };
+    childEnv.API_TOKEN = undefined;
+
+    child = spawn(process.execPath, ['--import', 'tsx', servePath], {
+      cwd: repoRoot,
+      env: childEnv,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
     const port = await waitForPort(child);
     const apiUrl = `http://127.0.0.1:${port}`;
-
-    const fixturePath = resolve(repoRoot, 'packages', 'contracts', 'fixtures', 'scan.sample.json');
-    const fixture = ScanPayload.parse(JSON.parse(readFileSync(fixturePath, 'utf-8')));
 
     const checksDir = resolve(here, 'checks');
     const checkFiles = readdirSync(checksDir)
@@ -160,22 +199,27 @@ async function main(): Promise<void> {
     ok = false;
     errors.push(err instanceof Error ? (err.stack ?? err.message) : String(err));
   } finally {
-    child.kill();
-    await new Promise<void>((r) => {
-      if (child.exitCode !== null || child.signalCode !== null) {
-        r();
-        return;
-      }
-      const t = setTimeout(r, 3000);
-      child.once('exit', () => {
-        clearTimeout(t);
-        r();
+    if (child) {
+      const runningChild = child;
+      runningChild.kill();
+      await new Promise<void>((r) => {
+        if (runningChild.exitCode !== null || runningChild.signalCode !== null) {
+          r();
+          return;
+        }
+        const t = setTimeout(r, 3000);
+        runningChild.once('exit', () => {
+          clearTimeout(t);
+          r();
+        });
       });
-    });
-    try {
-      rmSync(tmpDbDir, { recursive: true, force: true });
-    } catch {
-      // Best-effort cleanup; a lingering temp file is not a gate failure.
+    }
+    if (tmpDbDir) {
+      try {
+        rmSync(tmpDbDir, { recursive: true, force: true });
+      } catch {
+        // Best-effort cleanup; a lingering temp file is not a gate failure.
+      }
     }
   }
 

@@ -88,6 +88,9 @@ importers:
       '@pcpi/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@pcpi/core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
 packages:
 
