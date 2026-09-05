@@ -1,5 +1,10 @@
 import type { ValuationComparable, ValuationCoverage } from './domain.js';
 
+/** F12 — "1 part" / "2 parts": every count in this caption pluralizes its own noun independently. */
+function partsNoun(count: number): string {
+  return count === 1 ? 'part' : 'parts';
+}
+
 /**
  * The one wording for the "what does this valuation actually cover" line under Paid/Now/Δ —
  * architect-directed, 2026-09-05, presentation-only revision of the polish brief's Task 7 caption.
@@ -22,11 +27,6 @@ import type { ValuationComparable, ValuationCoverage } from './domain.js';
  * for the `→` arrow glyph it avoids for the same reason. One wording shared by all four surfaces
  * means it must be safe on the least capable one.
  */
-/** F12 — "1 part" / "2 parts": every count in this caption pluralizes its own noun independently. */
-function partsNoun(count: number): string {
-  return count === 1 ? 'part' : 'parts';
-}
-
 export function valuationCaption(v: {
   comparable: Pick<ValuationComparable, 'items'>;
   coverage: Pick<ValuationCoverage, 'withCurrent' | 'items'>;
