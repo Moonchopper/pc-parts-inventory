@@ -297,3 +297,42 @@ Show **Paid / Now / Δ** with a small **"n of m priced"** caption derived from `
 (`coverage.withCurrent` of `coverage.items`). **Δ renders `—` when `comparable.items == 0`** — never `0`, never
 `+0.0%`, because "no comparable items" and "no change" are different facts and conflating them is the original
 bug in another costume. Keep it within satori's CSS subset (flex only) and inside the 1200×630 card.
+
+---
+
+## Task 8 — proxy `GET /api/v1/share/*` through the web origin (architect-directed; blocks the §7 re-run)
+
+**The bug, reproduced by the PM against the running containers.** The share page correctly emits
+`og:image = http://localhost:5173/api/v1/share/{slug}/card.png` — right scheme, right origin (W0.6's `ORIGIN` fix
+works). But **`apps/web` does not serve `/api/v1/*`**, so that URL returns **404 `text/html`** through the web
+origin, while the same path on the API origin returns **200 `image/png`, 59654 bytes**. Discord fetches the
+`og:image` URL and gets a 404 page, so **the unfurl silently fails in the shipped topology** — Pillar 3's whole
+promise, broken in exactly the configuration we ship, with every automated gate green.
+
+**The fix.** `apps/web` proxies `GET /api/v1/share/*` **same-origin, server-side**, generalising the
+`b/[slug]/markdown/+server.ts` proxy W0.4 already ships:
+- **Stream** the upstream body — do not buffer a 60 KB PNG into a string; `.text()` would corrupt it.
+- **Preserve `Content-Type`, `ETag`, `Cache-Control`, and the `304` path** (forward `If-None-Match` upstream and
+  return 304 with no body when upstream says so). W0.5 built the ETag; do not discard it at the proxy.
+- Pass the upstream status through — a `private` build must still 404, not become a 500.
+- Cover `.md`, `/card.png` and the bare JSON route under one handler; if that makes W0.4's dedicated markdown
+  `+server.ts` redundant, fold it in and say so.
+
+**Why the web origin and not a public API origin:** the web origin is the one public origin. `PUBLIC_API_ORIGIN`
+would require exposing the API port to whoever fetches the unfurl. Same-origin proxying is also what hosting
+behind a reverse proxy looks like, so this is the shape we want anyway — not a workaround.
+
+**Acceptance (add to your report):** with `docker compose up -d` running,
+```
+curl -s -o card.png -w '%{http_code} %{content_type} %{size_download}\n' \
+     http://localhost:5173/api/v1/share/<slug>/card.png     # -> 200 image/png <bytes>
+curl -s -o /dev/null -w '%{http_code}\n' -H 'If-None-Match: <etag from above>' \
+     http://localhost:5173/api/v1/share/<slug>/card.png     # -> 304
+curl -s http://localhost:5173/api/v1/share/<slug>.md | head -5
+```
+Paste all three. If Docker is unavailable in your session, prove the same three against `pnpm dev` (api :3000 +
+web :5173) instead and **say which you used** — do not skip it, and do not claim a container run you did not do.
+
+**Scope addition:** `apps/web/src/routes/api/**` (or wherever the proxy route lives) — already inside your
+`apps/web/src/**` Scope. Do not touch `docker/**`, `compose.yaml` or `.github/**`; W0.6 is merged and those files
+are correct as they stand.

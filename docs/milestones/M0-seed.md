@@ -193,7 +193,10 @@ Goal: `tools/scanner/scan.ps1` emits a valid ScanPayload for a Windows machine.
 (D15) → `artifacts/harness/m0/report.json` must show: `importsIdempotent: true`, `productsCreated ≥ 5`,
 `partsCreated ≥ 6`, `buildsCreated: 1`, `quotesRecorded ≥ 2`, `share.html.ogTags: 4`, `share.md.rows == items`,
 `card.png.bytes > 10000`. The PM reads `card.png` and `share.html` and quotes what it saw. Then
-`docker compose up --build` + `curl` the share page.
+`docker compose up --build` + `curl` the share page **and its `og:image` through the web origin** —
+`curl -o card.png -w '%{http_code} %{content_type}' http://localhost:5173/api/v1/share/<slug>/card.png`
+must return **200 image/png**, because that is the URL Discord fetches to unfurl. (og:image proxy curl added
+2026-09-05 — architect.)
 
 **The gate reads money from the artifacts, never from the endpoint** (revised 2026-09-05 — architect; the original
 asserted `valuation.currentCents > 0` against `GET /builds/{id}/valuation` and so passed while every user-visible
