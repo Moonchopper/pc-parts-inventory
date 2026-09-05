@@ -14,7 +14,7 @@ with counters in `artifacts/harness/m0/report.json`, and `docker compose up` run
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | **TypeScript everywhere.** Node 24 LTS, pnpm workspace, TS strict. API = Hono + `@hono/zod-openapi`; DB = Drizzle (better-sqlite3 now; `drizzle-orm/postgres-js` later); web = SvelteKit 2 / Svelte 5 (adapter-node); tests = vitest; lint/format = Biome; PNG = satori + `@resvg/resvg-js`. **Exact version pins**, recorded in `CLAUDE.md` § Framework notes by the seed brief. | ADR-0001 |
+| D1 | **TypeScript everywhere.** Node 22 LTS (installed: 22.14.0; 24 is a later drop-in), pnpm via corepack (`corepack enable pnpm`), pnpm workspace, TS strict. API = Hono + `@hono/zod-openapi`; DB = Drizzle (better-sqlite3 now; `drizzle-orm/postgres-js` later); web = SvelteKit 2 / Svelte 5 (adapter-node); tests = vitest; lint/format = Biome; PNG = satori + `@resvg/resvg-js`. **Exact version pins**, recorded in `CLAUDE.md` § Framework notes by the seed brief. | ADR-0001 |
 | D2 | **The API is the product.** `apps/web` never imports Drizzle or touches the DB; it calls `apps/api` through the client generated from `/api/openapi.json`. Every UI feature is first an endpoint. | ADR-0001 |
 | D3 | **`ownerId` on every root table** (`products`, `parts`, `builds`, `imports`, `jobs`). v1 has one owner, seeded at first run with id `local`. No auth UI; an `API_TOKEN` env var — when set, mutating routes require `Authorization: Bearer`; when unset (dev/harness), open. Share routes are always public. | Pillar 4, R13 |
 | D4 | **Product / Part split.** `Product` = catalog identity (what it is); `Part` = a physical unit you own (serial, condition, cost basis, status). Quotes attach to products so two identical GPUs cost one fetch. Products are owner-scoped in v1; a global catalog is a later ADR. | Pillar 2 |
@@ -131,7 +131,7 @@ Order: **W0.1 and W0.2 in parallel** (disjoint) → PM accepts W0.1 → **W0.3, 
 
 ### W0.1 `seed-workspace-api` (Sonnet; **first; proves the toolchain**)
 Goal: the workspace builds, tests, lints and type-checks on Windows; the API boots; a scan imports; a build is readable.
-- pnpm workspace + root scripts; Biome; TS strict `tsconfig.base.json`; Node 24 in `.nvmrc`/`engines`; **recon step: `npm view <pkg> version` for every dependency and pin exact** (record the pins + Svelte-5/Drizzle/zod notes in a `CLAUDE.md` § Framework notes delta for the PM).
+- pnpm workspace + root scripts; Biome; TS strict `tsconfig.base.json`; Node 22 in `.nvmrc`/`engines` (`>=22.14`); pnpm bootstrapped with `corepack enable pnpm` (not preinstalled); **recon step: `npm view <pkg> version` for every dependency and pin exact** (record the pins + Svelte-5/Drizzle/zod notes in a `CLAUDE.md` § Framework notes delta for the PM).
 - `packages/contracts`: §4 schemas + `gen` script (writes `openapi.json` from the API's registry and `client.d.ts` via `openapi-typescript`).
 - `packages/core`: `normalizeScan(payload) → { products, parts, identityKeys }` (D8), `valuate(...)` (D5) — pure, unit-tested with `fixtures/scan.sample.json` (hand-written, ≥ 6 components incl. 2 identical memory sticks with different serials and 1 storage with serial).
 - `apps/api`: Hono + zod-openapi app; Drizzle schema §3 + first migration + `migrate` on boot; owner `local` seeded; `GET /health`, `POST /imports/scans`, `GET /imports/{id}`, `GET /builds`, `GET /builds/{id}`, `GET /parts`, `GET /products`, `GET /share/{slug}` (JSON only), `API_TOKEN` middleware; error shape.
@@ -140,7 +140,7 @@ Goal: the workspace builds, tests, lints and type-checks on Windows; the API boo
 
 ### W0.2 `scanner-ps1` (Sonnet; parallel with W0.1; scope `tools/scanner/**` + `packages/contracts/fixtures/**`)
 Goal: `tools/scanner/scan.ps1` emits a valid ScanPayload for a Windows machine.
-- `Get-CimInstance` over `Win32_Processor`, `Win32_VideoController`, `Win32_PhysicalMemory` (per stick, `DeviceLocator` → `slot`, `SerialNumber`, `PartNumber`), `MSFT_PhysicalDisk` (`root/Microsoft/Windows/Storage`; `SerialNumber`, `BusType`, `MediaType`, `Size`), `Win32_BaseBoard` + `Win32_BIOS`, `WmiMonitorID` (`root/wmi`; decode the uint16 arrays), `Win32_ComputerSystem` for hostname. PowerShell 5.1 **and** 7 compatible; no modules.
+- `Get-CimInstance` over `Win32_Processor`, `Win32_VideoController`, `Win32_PhysicalMemory` (per stick, `DeviceLocator` → `slot`, `SerialNumber`, `PartNumber`), `MSFT_PhysicalDisk` (`root/Microsoft/Windows/Storage`; `SerialNumber`, `BusType`, `MediaType`, `Size`), `Win32_BaseBoard` + `Win32_BIOS`, `WmiMonitorID` (`root/wmi`; decode the uint16 arrays), `Win32_ComputerSystem` for hostname. **Windows PowerShell 5.1 is the only PowerShell on Austin's box (no `pwsh`)** — 5.1 compatibility is required, 7 is a bonus; no modules.
 - Params: `-OutFile`, `-ApiUrl`, `-Token`, `-RedactSerials` (replaces serials with `sha256(serial)[0:12]`), `-Pretty`.
 - Manufacturer/model cleanup rules (strip "Corporation", "(R)", "(TM)", trailing whitespace; memory manufacturer from JEDEC id when `Manufacturer` is a number) — unit-testable as a separate `.ps1` function file + Pester tests **if Pester is present**, otherwise a `-SelfTest` switch with inline assertions.
 - Acceptance: runs on Austin's machine (the PM asks Austin via the architect if the agent cannot — the sandbox may not expose WMI) → `tools/scanner/fixtures/<hostname>.redacted.json` validates against the contracts schema (`pnpm --filter contracts validate <file>` — add that tiny script in this brief's scope). Evidence: the JSON, component count, categories present.
@@ -163,7 +163,7 @@ Goal: `tools/scanner/scan.ps1` emits a valid ScanPayload for a Windows machine.
 - Harness delta: fetch both; assert MD has one row per item; PNG > 10 KB; save `card.png`. **The PM reads the PNG.**
 
 ### W0.6 `containers-and-ci` (Sonnet; last; scope `docker/**`, `compose.yaml`, `.github/**`, `apps/*/Dockerfile` if preferred, root `.dockerignore`)
-- `Dockerfile.api` (multi-stage; `node:24-slim` runtime or distroless; `HEALTHCHECK` on `/health`), `Dockerfile.web` (adapter-node build). `compose.yaml`: `api` (volume `pcpi-data:/data`, `DATABASE_URL=file:/data/pcpi.db`), `web` (`API_URL=http://api:3000`), ports 3000/5173→3000/3001; `postgres` profile stub (service + env, not exercised).
+- `Dockerfile.api` (multi-stage; `node:22-slim` runtime or distroless; `HEALTHCHECK` on `/health`), `Dockerfile.web` (adapter-node build). `compose.yaml`: `api` (volume `pcpi-data:/data`, `DATABASE_URL=file:/data/pcpi.db`), `web` (`API_URL=http://api:3000`), ports 3000/5173→3000/3001; `postgres` profile stub (service + env, not exercised).
 - CI: `ubuntu-latest` + `windows-latest` matrix → install, build, typecheck, lint, test, harness; upload `artifacts/harness/**`; `docker compose build` on ubuntu.
 - Acceptance: `docker compose up --build` on Austin's box serves `/b/{slug}` from the container (PM verifies with `curl`), CI green on both OSes (link + tails in the report).
 
@@ -180,7 +180,13 @@ Must cover: run `scan.ps1` on a second machine → it appears as a build; open `
 URL into Discord (unfurl shows the card); "copy Markdown" → paste into a Reddit comment preview; edit a part's
 acquired price → valuation delta changes; `docker compose up` cold start.
 
-## 9. Out of scope for M0 (M1/M2)
+## 9. Toolchain facts on Austin's box (2026-09-05)
+
+Node v22.14.0 · npm 10.9.2 · **pnpm not installed** (use corepack) · Docker 29.6.1 · **Windows PowerShell 5.1 only** (no pwsh) ·
+Git Bash is the agents' shell (`Bash` tool); `powershell -NoProfile -File tools/scanner/scan.ps1 …` runs the scanner. The
+implementer for W0.2 runs the scan on this machine; if CIM is blocked in the sandbox, the PM escalates and the architect asks Austin.
+
+## 10. Out of scope for M0 (M1/M2)
 
 Order-history importers (M1), barcode capture (M1), scheduled refresh cadence UI (M1), Keepa/eBay providers (M1+),
 PWA manifest (M2), Postgres exercised (M2), auth beyond the token seam (later ADR), wishlist items (later ADR),

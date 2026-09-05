@@ -4,7 +4,7 @@ Self-hosted inventory of owned PC hardware with automated capture (hardware scan
 barcode), **paid-vs-now** pricing with a history we own, and builds that are shareable as a URL and as exports.
 Local-first (SQLite, two containers), designed to become hosted. **Stack (ADR-0001, accepted 2026-09-05):
 TypeScript everywhere — Hono + zod-openapi API, Drizzle (SQLite → Postgres), SvelteKit web as a pure API client,
-satori + resvg for PNG cards, vitest + Biome, pnpm workspace, Node 24.** The API is the product; the web never
+satori + resvg for PNG cards, vitest + Biome, pnpm workspace, Node 22 LTS.** The API is the product; the web never
 touches the DB.
 Read in this order when starting a task: this file → the brief you were given → the docs it links.
 **Research before you edit:** read a file before editing it; grep for all callers before changing a function.
@@ -33,7 +33,7 @@ pnpm harness --name <n>          # boots the API on a temp SQLite DB with HARNES
 pnpm gen                         # contracts → openapi.json + generated client types (commit the output)
 pnpm dev                         # api :3000 (Scalar docs at /api/docs) + web :5173
 docker compose up --build        # api + web containers, named volume pcpi-data
-pwsh tools/scanner/scan.ps1 -OutFile scan.json [-ApiUrl http://localhost:3000 -Token …] [-RedactSerials]
+powershell -NoProfile -File tools/scanner/scan.ps1 -OutFile scan.json [-ApiUrl http://localhost:3000 -Token …] [-RedactSerials]   # Windows PowerShell 5.1 (pwsh 7 also works if present)
 ```
 
 ## Layout (target — `docs/milestones/M0-seed.md` §2 is the source of truth)
