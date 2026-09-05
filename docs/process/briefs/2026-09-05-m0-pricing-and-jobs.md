@@ -184,3 +184,29 @@ The seed is merged. Three clarifications so you never need to touch `apps/api/sr
    `AMD`/`Radeon Graphics`, `G.SKILL`/`F5-6000J3036G32G` (partNumber `F5-6000J3036G32G`),
    `Crucial`/`CT2000T700SSD5`, `Gigabyte`/`B650 EAGLE AX`, `Dell`/`AW3423DWF`, `Acer`/`ED323QUR A`,
    `BenQ`/`XL2430T`. Note the models do **not** repeat the manufacturer — match on that form.
+
+---
+
+## PM addendum 2 (2026-09-05, architect-directed contract correction — sent to the running agent by message)
+
+**`jobs` gains `ownerId`.** D1–D15 said (D3) "`ownerId` on every root table (`products`, `parts`, `builds`,
+`imports`, `jobs`)", but §3's `jobs` row omitted the column. The architect has ruled that **§3 was wrong and D3
+is the intent**, and that the correction lands **now, in this brief**, because W0.3 is the only consumer of
+`jobs`, no migration beyond `0000` exists yet, and W0.4/W0.5 touch neither `db/schema.ts` nor `drizzle/` — this
+is the one moment the change is additive with zero collision. `docs/milestones/M0-seed.md` §3 and the D3 row have
+been updated on the wave branch.
+
+**Scope grows by exactly two things** (everything else in Scope/Non-goals is unchanged):
+- `apps/api/src/db/schema.ts` — the `jobs` table **only**. Do not touch any other table.
+- a new `apps/api/drizzle/0001_*.sql` (+ its `meta/` entries) produced by
+  `pnpm --filter @pcpi/api db:generate`. Do not hand-edit `0000_*` or its snapshot.
+
+**Semantics:** `ownerId: text('owner_id').notNull().references(() => owners.id)`. Every enqueued job carries the
+owner of the thing it acts on — `price_refresh` takes the `ownerId` of the product being refreshed. **The runner
+does not filter by owner in M0**; the column exists so multi-tenancy stays additive (D3), not to gate anything yet.
+
+**Evidence required:** one named test asserting an enqueued job has `ownerId === 'local'`, plus the usual gates.
+Migrations run on boot, so the harness passing is itself proof `0001` applies cleanly on a fresh DB.
+
+If you have already committed schema-adjacent work that makes this awkward, **say so instead of forcing it** —
+report it and the PM will route it back to the architect.

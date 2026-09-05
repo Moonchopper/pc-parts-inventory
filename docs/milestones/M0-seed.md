@@ -16,7 +16,7 @@ with counters in `artifacts/harness/m0/report.json`, and `docker compose up` run
 |---|---|---|
 | D1 | **TypeScript everywhere.** Node 22 LTS (installed: 22.14.0; 24 is a later drop-in), pnpm via corepack (`corepack enable pnpm`), pnpm workspace, TS strict. API = Hono + `@hono/zod-openapi`; DB = Drizzle (better-sqlite3 now; `drizzle-orm/postgres-js` later); web = SvelteKit 2 / Svelte 5 (adapter-node); tests = vitest; lint/format = Biome; PNG = satori + `@resvg/resvg-js`. **Exact version pins**, recorded in `CLAUDE.md` § Framework notes by the seed brief. | ADR-0001 |
 | D2 | **The API is the product.** `apps/web` never imports Drizzle or touches the DB; it calls `apps/api` through the client generated from `/api/openapi.json`. Every UI feature is first an endpoint. | ADR-0001 |
-| D3 | **`ownerId` on every root table** (`products`, `parts`, `builds`, `imports`, `jobs`). v1 has one owner, seeded at first run with id `local`. No auth UI; an `API_TOKEN` env var — when set, mutating routes require `Authorization: Bearer`; when unset (dev/harness), open. Share routes are always public. | Pillar 4, R13 |
+| D3 | **`ownerId` on every root table** (`products`, `parts`, `builds`, `imports`, `jobs`). v1 has one owner, seeded at first run with id `local`. No auth UI; an `API_TOKEN` env var — when set, mutating routes require `Authorization: Bearer`; when unset (dev/harness), open. Share routes are always public. (§3 `jobs` corrected 2026-09-05 — architect.) | Pillar 4, R13 |
 | D4 | **Product / Part split.** `Product` = catalog identity (what it is); `Part` = a physical unit you own (serial, condition, cost basis, status). Quotes attach to products so two identical GPUs cost one fetch. Products are owner-scoped in v1; a global catalog is a later ADR. | Pillar 2 |
 | D5 | **Price quotes are append-only** (`price_quotes`). "Current value" is a query: latest quote per product with kind precedence `used_market > new_retail > msrp`; the response says which kind and how old. | Pillar 2 |
 | D6 | **Money = integer minor units + ISO-4217 currency** (`priceCents`, `currency` default `USD`). No floats. | — |
@@ -67,7 +67,7 @@ price_quotes  { id, productId, providerLinkId?, provider: text, kind: enum('new_
                 priceCents: int, currency: text, observedAt: timestamp, sourceUrl: text?, raw: json? }   // append-only
 imports       { id, ownerId, kind: enum('scan','order_csv','manual'), source: text, payloadHash: text unique, payload: json,
                 status: enum('received','processed','failed'), summary: json?, receivedAt, processedAt? }
-jobs          { id, kind: text, runAt: timestamp, status: enum('queued','running','done','failed'), attempts: int, payload: json, lastError: text? }
+jobs          { id, ownerId → owners, kind: text, runAt: timestamp, status: enum('queued','running','done','failed'), attempts: int, payload: json, lastError: text? }
 ```
 
 `category` enum (matches PCPartPicker's vocabulary): `cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu,
