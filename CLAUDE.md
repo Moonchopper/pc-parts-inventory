@@ -23,7 +23,7 @@ Read in this order when starting a task: this file → the brief you were given 
 
 ```bash
 # pnpm bootstrap on Austin's box: `corepack enable pnpm` FAILS (EPERM — D:\nodejs is not user-writable).
-# Use a writable dir already on PATH:  corepack enable --install-directory C:\Users\austi\bin pnpm
+# Use a writable dir on the PERSISTENT user PATH (PowerShell + Git Bash):  corepack enable --install-directory C:\Users\austi\.local\bin pnpm
 # CI runners are fine with plain `corepack enable` / pnpm/action-setup.
 pnpm install --frozen-lockfile
 pnpm build                       # all workspaces
