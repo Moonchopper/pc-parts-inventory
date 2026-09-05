@@ -391,3 +391,26 @@ git diff 2d3cb56..HEAD            # read it — this is the state you are inheri
    - **Δ rendering:** `—` when `comparable.items == 0`, never `0` and never `+0.0%`.
 4. Then the brief's normal **Acceptance**, **Done definition** and the §9 report. Commit properly on top of the
    checkpoint (do not amend it — it is the recovery point).
+
+---
+
+## Task 9 — explanatory caption (architect-directed, 2026-09-05; presentation only, no contract change)
+
+The PM raised that `Paid $1,800.00 · Now $1,678.96 · −$236.03` invites the reader to compute
+`1800.00 − 1678.96 = 121.04` and wonder why Δ says `236.03`. Both figures are correct — the totals span different
+item sets and Δ is the like-for-like `comparable` delta — but three numbers side by side, where the third is not
+the difference of the first two, is the first thing a human queries. The headline numbers stay; **the caption
+becomes explanatory**, replacing `"n of m priced"`. One wording, one place per renderer, across **all four
+surfaces** (card, Markdown, share page, build page):
+
+| condition | caption |
+|---|---|
+| `comparable.items > 0` | `Now covers {coverage.withCurrent} of {coverage.items} parts · Δ over the {comparable.items} parts with both a cost basis and a price` |
+| `comparable.items == 0` (Δ is `—`) | `Now covers {coverage.withCurrent} of {coverage.items} parts · no part has both a cost basis and a price yet` |
+| `coverage.withCurrent == 0` (Now is `—`) | `No prices yet · add a provider or refresh` |
+
+Every number is read from `coverage` and `comparable` **directly — never recomputed from the totals**, which is
+the D5 guard rail now recorded in `CLAUDE.md` § Conventions. On the card the caption may wrap to two lines and the
+whole footer block must still sit inside the 48px padding box (budget for two lines even when one renders). In
+Markdown it is a single italic line beneath the totals. Unit tests cover all three states in `card.ts` and
+`markdown.ts`; the share and build pages assert the same strings, so the four surfaces cannot drift apart.
