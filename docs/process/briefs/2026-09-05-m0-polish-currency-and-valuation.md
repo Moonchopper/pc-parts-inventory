@@ -234,3 +234,66 @@ still says that. That image is the M0 outcome sentence, paid-vs-now, proven end 
 
 **Sequencing:** this brief is cut from `feat/m0-seed` **after `m0-crud-endpoints` is merged**. It may run in
 parallel with W0.6 (disjoint scopes). The §7 re-run happens after both land.
+
+---
+
+## Task 7 — **the D5 fallback bug** (architect-directed contract revision; read this before Tasks 4–6)
+
+**This supersedes the shape Task 4 assumed.** `docs/milestones/M0-seed.md` §4 and D5 are already updated.
+
+### The bug
+`packages/core/src/valuate.ts` line ~61:
+```ts
+const itemCurrent = quote ? quote.priceCents : itemAcquired;   // <-- fallback to the acquired price
+```
+When a product has no quote, the item's **acquired price is counted as its current value**. The PM reproduced it:
+two parts, `12345 + 6789` cents acquired, **zero quotes** → `acquiredCents 19134, currentCents 19134,
+deltaCents 0`. A build of unpriced hardware reports "no change", which inverts what Pillar 2 promises. Worse, the
+**same response contradicts itself**: per-item `currentCents` is correctly omitted for unpriced items while the
+build total silently substitutes the acquired price.
+
+**A unit test asserts the wrong behaviour** — `packages/core/test/valuate.test.ts`, `'sums acquired vs current
+across items and computes deltaCents/deltaPct'`, feeds `{ partId: 'b', acquiredCents: 5000, quotes: [] }` and
+expects `currentCents === 13000`. **You must rewrite that test, not work around it.** Under the new contract that
+case yields `currentCents 8000`, `comparable.items 1`, `coverage.withAcquired 2`, `coverage.withCurrent 1`.
+
+### The new `Valuation` contract (verbatim; ★ = also carried by `SharedBuild.valuation`)
+```ts
+Valuation = {
+  buildId, currency,
+  acquiredCents ★,   // Σ acquired over items with a known cost basis — "what I paid"
+  currentCents ★,    // Σ current over items with a quote — "what the priced parts are worth now"
+  comparable ★: { items, acquiredCents, currentCents, deltaCents, deltaPct | null },
+                     // like-for-like over items having BOTH; deltaCents == currentCents − acquiredCents
+                     // holds HERE and only here; deltaPct is null when comparable.acquiredCents == 0
+  coverage ★:   { items, withAcquired, withCurrent },
+  items: [{ partId, quantity, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }]
+}
+```
+- **Drop the top-level `deltaCents`/`deltaPct` entirely.** A delta over mismatched item sets is not a delta.
+  There is no `unpricedItems` field — `coverage` replaces it.
+- **Per-item semantics, previously unstated — this is where the bug hid.** `parts.acquiredPriceCents` is the
+  **total paid for that part row (all of its `quantity`)**; an item's `currentCents` is the chosen quote's
+  **`priceCents × quantity`**. A row with a quote but no cost basis contributes to `currentCents` and
+  `coverage.withCurrent` but **not** to `comparable`.
+- **No fallback in either direction, ever.** No acquired→current, no current→acquired.
+
+### Where the fix lands
+1. `packages/core/src/valuate.ts` — remove the fallback; compute `comparable` and `coverage`; apply `× quantity`.
+2. `packages/core/test/valuate.test.ts` — rewrite the wrong test to the new shape (values above), and add a case
+   for a quoted-but-no-cost-basis row and one for `comparable.items == 0` (`deltaPct` must be `null`).
+3. `packages/contracts` — the `Valuation` schema, and `SharedBuild.valuation` as the ★ subset. Regenerate.
+4. The API valuation service and the share population (Task 4) emit the new shape.
+5. `tools/harness/checks/30-pricing.ts` — assert the identity **inside `comparable`**
+   (`comparable.deltaCents === comparable.currentCents - comparable.acquiredCents`), not at the top level.
+   It currently asserts the old top-level identity and **will fail until you update it**; that is expected.
+6. §7 assertions (Task 6) become: `share.json.valuation.acquiredCents > 0`, `currentCents > 0`,
+   **`comparable.items >= 2`**, **`comparable.deltaCents != 0`**. **Choose `cost-basis.json` values that differ
+   from the fixture quotes** so the delta is provably nonzero — equal values would pass `!= 0` only by accident,
+   and a zero delta is exactly the bug you are fixing.
+
+### Presentation (card, Markdown, page)
+Show **Paid / Now / Δ** with a small **"n of m priced"** caption derived from `coverage`
+(`coverage.withCurrent` of `coverage.items`). **Δ renders `—` when `comparable.items == 0`** — never `0`, never
+`+0.0%`, because "no comparable items" and "no change" are different facts and conflating them is the original
+bug in another costume. Keep it within satori's CSS subset (flex only) and inside the 1200×630 card.

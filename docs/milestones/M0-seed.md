@@ -18,7 +18,7 @@ with counters in `artifacts/harness/m0/report.json`, and `docker compose up` run
 | D2 | **The API is the product.** `apps/web` never imports Drizzle or touches the DB; it calls `apps/api` through the client generated from `/api/openapi.json`. Every UI feature is first an endpoint. | ADR-0001 |
 | D3 | **`ownerId` on every root table** (`products`, `parts`, `builds`, `imports`, `jobs`). v1 has one owner, seeded at first run with id `local`. No auth UI; an `API_TOKEN` env var — when set, mutating routes require `Authorization: Bearer`; when unset (dev/harness), open. Share routes are always public. (§3 `jobs` corrected 2026-09-05 — architect.) | Pillar 4, R13 |
 | D4 | **Product / Part split.** `Product` = catalog identity (what it is); `Part` = a physical unit you own (serial, condition, cost basis, status). Quotes attach to products so two identical GPUs cost one fetch. Products are owner-scoped in v1; a global catalog is a later ADR. | Pillar 2 |
-| D5 | **Price quotes are append-only** (`price_quotes`). "Current value" is a query: latest quote per product with kind precedence `used_market > new_retail > msrp`; the response says which kind and how old. | Pillar 2 |
+| D5 | **Price quotes are append-only** (`price_quotes`). "Current value" is a query: latest quote per product with kind precedence `used_market > new_retail > msrp`; the response says which kind and how old. **No fallback: an item with no quote has no current value and is excluded from the comparable set.** (no fallback; comparable set — 2026-09-05 architect) | Pillar 2 |
 | D6 | **Money = integer minor units + ISO-4217 currency** (`priceCents`, `currency` default `USD`). No floats. | — |
 | D7 | **Builds are shareable by slug.** `slug` = 10-char lowercase base32 nanoid, user-overridable, globally unique. `visibility`: `private \| unlisted \| public`, default **`unlisted`** (URL works; not listed). Web route `/b/{slug}`; API `GET /share/{slug}` (+ `.md`, `/card.png`). | Pillar 3 |
 | D8 | **Scan import is idempotent.** Identity key per component: `serial` if present, else `(category, manufacturer, model, slot)`. Re-scanning a host updates in place; components missing from a later scan are marked `status = on_shelf` (never deleted). One build per `hostname` is auto-created (`name = hostname`, `source = 'scan'`) and scanned parts are placed in it. | Pillar 1 |
@@ -89,8 +89,24 @@ motherboard `biosVersion, chipset`; monitor `widthPx, heightPx, manufactureYear`
 **API DTOs** (response shapes; request shapes are the same minus server fields):
 `Owner`, `Product`, `Part` (+ `product`), `Build` (+ `items: (BuildItem & { part, product })[]`), `ProviderLink`, `PriceQuote`,
 `Import` (+ `summary: { productsCreated, productsUpdated, partsCreated, partsUpdated, partsShelved, buildId }`),
-`Valuation = { buildId, currency, acquiredCents, currentCents, deltaCents, deltaPct, items: { partId, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }[] }`,
-`SharedBuild = { slug, name, description?, updatedAt, currency, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, deltaCents } }` (currency added 2026-09-05 — architect)
+```ts
+Valuation = {                        // (revised 2026-09-05 — architect: no fallback; explicit comparable set)
+  buildId, currency,
+  acquiredCents ★,   // Σ acquired over items with a known cost basis — "what I paid"
+  currentCents ★,    // Σ current over items with a quote — "what the priced parts are worth now"
+  comparable ★: { items, acquiredCents, currentCents, deltaCents, deltaPct | null },
+                     // like-for-like over items having BOTH; deltaCents == currentCents − acquiredCents
+                     // holds HERE and only here; deltaPct is null when comparable.acquiredCents == 0
+  coverage ★:   { items, withAcquired, withCurrent },
+  items: [{ partId, quantity, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }]
+}
+```
+There is **no top-level `deltaCents`/`deltaPct`** — a delta over mismatched item sets is not a delta, so it lives
+only inside `comparable`. **Per-item:** `parts.acquiredPriceCents` is the **total** paid for that part row (all of
+its `quantity`); an item's `currentCents` is the chosen quote's `priceCents × quantity`. A row with a quote but no
+cost basis contributes to `currentCents` and `coverage.withCurrent` but **not** to `comparable`. **No fallback in
+either direction, ever.** The ★ fields are the subset carried by `SharedBuild.valuation`.
+`SharedBuild = { slug, name, description?, updatedAt, currency, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, comparable, coverage } }` (currency added 2026-09-05 — architect)
 **Share item order** (and `GET /builds/{id}` items) is deterministic: category in the display order of the §3 enum
 (`cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu, case_fan, monitor, os, keyboard, mouse, headset,
 other`), then manufacturer, then model, then quantity descending. Sorted **once, in the API**, so JSON, page, MD
@@ -185,7 +201,9 @@ artifact rendered em-dashes). Before the share fetches, the harness `PATCH`es `a
 of the imported build, with values from `packages/contracts/fixtures/cost-basis.json` keyed by `identityKey`
 (fewer than 2 matches fails the check). It then asserts, from the share payload and exports:
 `share.json.valuation.acquiredCents > 0`, `share.json.valuation.currentCents > 0`,
-`share.json.valuation.deltaCents != 0`, `share.md` contains **at least two non-dash prices and a totals line**, and
+`share.json.valuation.comparable.items >= 2`, `share.json.valuation.comparable.deltaCents != 0` (choose
+`cost-basis.json` values that differ from the fixture quotes so the delta is provably nonzero),
+`share.md` contains **at least two non-dash prices and a totals line**, and
 `share.json.items` is **identical across two runs** (the item-order rule above). **`card.png` must show a total, not
 "Valuation not available yet"** — that image is this milestone's outcome sentence, paid-vs-now, proven end to end.
 
