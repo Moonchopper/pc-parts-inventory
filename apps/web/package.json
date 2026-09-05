@@ -1,0 +1,26 @@
+{
+  "name": "@pcpi/web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "svelte-kit sync && vite build",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "svelte-kit sync && vitest run",
+    "dev": "vite dev",
+    "preview": "vite preview",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@pcpi/contracts": "workspace:*",
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "5.5.7",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "svelte": "5.57.0",
+    "svelte-check": "4.7.6",
+    "vite": "8.2.2"
+  }
+}
