@@ -106,7 +106,20 @@ export default {
 
     const child = spawn(process.execPath, [serverEntry], {
       cwd: webDir,
-      env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', API_URL: ctx.apiUrl },
+      env: {
+        ...process.env,
+        PORT: String(port),
+        HOST: '127.0.0.1',
+        API_URL: ctx.apiUrl,
+        // adapter-node's origin autodetection defaults the scheme to `https` when neither `ORIGIN`
+        // nor a trusted `PROTOCOL_HEADER` is set (see @sveltejs/adapter-node/files/handler.js
+        // `get_origin`) — wrong for this plain-HTTP harness server, which would otherwise make
+        // og:url/og:image absolute URLs claim a scheme the server doesn't actually speak. Setting
+        // both here (Recon #4's `PUBLIC_ORIGIN` override, and adapter-node's own `ORIGIN`) keeps
+        // `url.origin` and the emitted tags consistent with the URL this check actually fetches.
+        ORIGIN: webUrl,
+        PUBLIC_ORIGIN: webUrl,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     }) as WebChildProcess;
 
@@ -133,7 +146,9 @@ export default {
       const ogTagCount = OG_PROPERTIES.filter((p) => html.includes(`property="${p}"`)).length;
       if (ogTagCount !== 4) {
         const missing = OG_PROPERTIES.filter((p) => !html.includes(`property="${p}"`));
-        ctx.fail(`expected 4 OG tags, found ${ogTagCount} (missing: ${missing.join(', ') || 'none'})`);
+        ctx.fail(
+          `expected 4 OG tags, found ${ogTagCount} (missing: ${missing.join(', ') || 'none'})`,
+        );
       }
 
       const missingModels = models.filter((m) => !html.includes(m));

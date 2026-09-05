@@ -1,7 +1,7 @@
-import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
-import { getSharedBuild } from '$lib/server/api.js';
+import { env } from '$env/dynamic/private';
 import { buildOgImageUrl, buildOgTags, buildShareUrl, resolveOrigin } from '$lib/og.js';
+import { getSharedBuild } from '$lib/server/api.js';
 import type { PageServerLoad } from './$types.js';
 
 function summarize(build: NonNullable<Awaited<ReturnType<typeof getSharedBuild>>>): string {

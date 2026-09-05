@@ -9,7 +9,9 @@ import type { RequestHandler } from './$types.js';
  * status/body straight through — no markdown generation happens here, that stays W0.5's.
  */
 export const GET: RequestHandler = async ({ params }) => {
-  const upstream = await fetch(`${API_BASE_URL}/api/v1/share/${encodeURIComponent(params.slug)}.md`);
+  const upstream = await fetch(
+    `${API_BASE_URL}/api/v1/share/${encodeURIComponent(params.slug)}.md`,
+  );
   const body = await upstream.text();
   return new Response(body, {
     status: upstream.status,
