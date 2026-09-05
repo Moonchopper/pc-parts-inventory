@@ -8,6 +8,13 @@
       "when": 1788623346225,
       "tag": "0000_wonderful_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788625593940,
+      "tag": "0001_clear_shadow_king",
+      "breakpoints": true
     }
   ]
 }

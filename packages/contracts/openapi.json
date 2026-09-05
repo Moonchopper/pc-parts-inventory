@@ -539,6 +539,233 @@
           "addedAt"
         ]
       },
+      "Valuation": {
+        "type": "object",
+        "properties": {
+          "buildId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "acquiredCents": {
+            "type": "integer"
+          },
+          "currentCents": {
+            "type": "integer"
+          },
+          "deltaCents": {
+            "type": "integer"
+          },
+          "deltaPct": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValuationItem"
+            }
+          }
+        },
+        "required": [
+          "buildId",
+          "currency",
+          "acquiredCents",
+          "currentCents",
+          "deltaCents",
+          "deltaPct",
+          "items"
+        ]
+      },
+      "ValuationItem": {
+        "type": "object",
+        "properties": {
+          "partId": {
+            "type": "string"
+          },
+          "acquiredCents": {
+            "type": "integer"
+          },
+          "currentCents": {
+            "type": "integer"
+          },
+          "quote": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/QuoteKind"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "observedAt": {
+                "type": "string"
+              },
+              "ageDays": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "provider",
+              "observedAt",
+              "ageDays"
+            ]
+          }
+        },
+        "required": [
+          "partId"
+        ]
+      },
+      "QuoteKind": {
+        "type": "string",
+        "enum": [
+          "new_retail",
+          "used_market",
+          "msrp",
+          "manual"
+        ]
+      },
+      "ProductPatch": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "partNumber": {
+            "type": "string"
+          },
+          "upc": {
+            "type": "string"
+          },
+          "specs": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "PriceQuote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "providerLinkId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/QuoteKind"
+          },
+          "priceCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "raw": {}
+        },
+        "required": [
+          "id",
+          "productId",
+          "provider",
+          "kind",
+          "priceCents",
+          "currency",
+          "observedAt"
+        ]
+      },
+      "ProviderLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "provider",
+          "externalId",
+          "confidence",
+          "verified",
+          "createdAt"
+        ]
+      },
+      "CreateProviderLink": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "externalId",
+          "confidence"
+        ]
+      },
+      "ProviderLinkPatch": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "verified"
+        ]
+      },
       "SharedBuild": {
         "type": "object",
         "properties": {
@@ -611,6 +838,73 @@
           "manufacturer",
           "model",
           "quantity"
+        ]
+      },
+      "ProviderInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteKind"
+            }
+          },
+          "configured": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kinds",
+          "configured"
+        ]
+      },
+      "RunDueResponse": {
+        "type": "object",
+        "properties": {
+          "ran": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobResult"
+            }
+          }
+        },
+        "required": [
+          "ran",
+          "results"
+        ]
+      },
+      "JobResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "failed"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "detail"
         ]
       }
     },
@@ -769,6 +1063,42 @@
         }
       }
     },
+    "/api/v1/builds/{id}/valuation": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "D5 — acquired vs. current value for this build, by kind precedence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Valuation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/parts": {
       "get": {
         "responses": {
@@ -817,6 +1147,351 @@
         }
       }
     },
+    "/api/v1/products/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Product updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{id}/quotes": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/QuoteKind"
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price quotes for this product, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceQuote"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{id}/refresh": {
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "A price_refresh job was enqueued for this product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "jobId"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{id}/links": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider links for this product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderLink"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProviderLink"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Manual provider link created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{id}/links/{linkId}": {
+      "patch": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "linkId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderLinkPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider link updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/share/{slug}": {
       "get": {
         "parameters": [
@@ -842,6 +1517,61 @@
           },
           "404": {
             "description": "Not found or private",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Every pricing provider M0 knows about (not just the ones PRICING_PROVIDERS activates)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderInfo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/run-due": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Every currently-due job was run once to completion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available outside HARNESS=1 / NODE_ENV=development",
             "content": {
               "application/json": {
                 "schema": {
