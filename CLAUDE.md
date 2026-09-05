@@ -22,6 +22,9 @@ Read in this order when starting a task: this file → the brief you were given 
 ## Commands (run from the repo/worktree root — the M0 seed creates them; keep this block true)
 
 ```bash
+# pnpm bootstrap on Austin's box: `corepack enable pnpm` FAILS (EPERM — D:\nodejs is not user-writable).
+# Use a writable dir already on PATH:  corepack enable --install-directory C:\Users\austi\bin pnpm
+# CI runners are fine with plain `corepack enable` / pnpm/action-setup.
 pnpm install --frozen-lockfile
 pnpm build                       # all workspaces
 pnpm typecheck                   # tsc -b + svelte-check
