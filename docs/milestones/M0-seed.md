@@ -91,6 +91,10 @@ motherboard `biosVersion, chipset`; monitor `widthPx, heightPx, manufactureYear`
 `Import` (+ `summary: { productsCreated, productsUpdated, partsCreated, partsUpdated, partsShelved, buildId }`),
 `Valuation = { buildId, currency, acquiredCents, currentCents, deltaCents, deltaPct, items: { partId, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }[] }`,
 `SharedBuild = { slug, name, description?, updatedAt, currency, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, deltaCents } }` (currency added 2026-09-05 — architect)
+**Share item order** (and `GET /builds/{id}` items) is deterministic: category in the display order of the §3 enum
+(`cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu, case_fan, monitor, os, keyboard, mouse, headset,
+other`), then manufacturer, then model, then quantity descending. Sorted **once, in the API**, so JSON, page, MD
+and PNG always agree. (item order added 2026-09-05 — architect)
 (share responses never include serials, notes, acquiredSource or owner data).
 
 **Error shape** (all non-2xx): `{ error: { code: string, message: string, details?: unknown } }`.

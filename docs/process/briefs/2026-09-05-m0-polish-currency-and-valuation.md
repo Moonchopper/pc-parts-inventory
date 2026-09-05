@@ -137,3 +137,40 @@ field the architect approved.**
 Playbook §9 report with real tails per gate, both harness runs' counters quoted, your own reading of
 `card.png`, the inventory bucket counts, no TODOs, gate tails in the final commit message, work only on
 `feat/m0-polish-currency-valuation`, doc deltas in `Follow-ups`.
+
+---
+
+## Task 3 — deterministic item order (architect-directed, 2026-09-05: a **rule**, not a suggestion)
+
+**The problem.** The PM observed the same build rendering its items in a different order on consecutive harness
+runs. Today's ordering is whatever the database hands back, so the share JSON, the web page, the Markdown table
+and the PNG card can each disagree with the other three, and the same build looks different every time it is
+shared. PCPartPicker orders by component type, and that is the bar (intake, Pillar 3).
+
+**The rule.** Share items — and the items of `GET /builds/{id}` — are ordered by:
+1. **category**, in the display order of the §3 enum:
+   `cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu, case_fan, monitor, os, keyboard, mouse,
+   headset, other`
+2. then **manufacturer** (locale-independent comparison — use `localeCompare` with a fixed locale or plain `<`,
+   not the ambient one)
+3. then **model**
+4. then **quantity descending**
+
+**Sort once, in the API.** The share route (and `GET /builds/{id}`) emits already-ordered items; the Markdown
+renderer, the PNG renderer and the web page consume that order and **must not re-sort**. One sort, four consumers,
+no possibility of drift. If you find yourself adding a second `.sort()` anywhere downstream, that is the bug.
+
+**Where the ordinal list lives.** `packages/contracts`, next to the category enum, exported as **`categoryOrder`**,
+so the inventory page can use the same one. Note that the required order is **identical to the existing
+`CATEGORIES` declaration order** — so derive `categoryOrder` from `CATEGORIES` (an index lookup) rather than
+typing a second list that can silently drift out of step with the enum. If you do write a literal, add a test that
+asserts the two agree member-for-member.
+
+**Named test required:** two runs over the same fixture produce **identical item arrays** — deep-equal, not
+just same-length. A test that only checks the first element is not sufficient.
+
+**Scope additions for this task:** `packages/contracts/src/**` (the `categoryOrder` export, already in Scope) and
+**`apps/api/src/builds/routes.ts`** (the `GET /builds/{id}` item ordering). Everything else in Scope/Non-goals is
+unchanged — in particular `apps/api/src/pricing/**` and `apps/api/src/jobs/**` remain read-only.
+
+`docs/milestones/M0-seed.md` §4 records this rule under `SharedBuild`.
