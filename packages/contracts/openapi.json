@@ -539,6 +539,82 @@
           "addedAt"
         ]
       },
+      "BuildCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "BuildPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "DeletedAck": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "BuildItemCreate": {
+        "type": "object",
+        "properties": {
+          "partId": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "partId"
+        ]
+      },
+      "RemovedAck": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "removed"
+        ]
+      },
       "Valuation": {
         "type": "object",
         "properties": {
@@ -625,6 +701,88 @@
           "msrp",
           "manual"
         ]
+      },
+      "PartCreate": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PartStatus"
+          },
+          "acquiredAt": {
+            "type": "string"
+          },
+          "acquiredPriceCents": {
+            "type": "integer"
+          },
+          "acquiredCurrency": {
+            "type": "string"
+          },
+          "acquiredSource": {
+            "type": "string"
+          },
+          "soldAt": {
+            "type": "string"
+          },
+          "soldPriceCents": {
+            "type": "integer"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "PartPatch": {
+        "type": "object",
+        "properties": {
+          "serial": {
+            "type": "string"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PartStatus"
+          },
+          "acquiredAt": {
+            "type": "string"
+          },
+          "acquiredPriceCents": {
+            "type": "integer"
+          },
+          "acquiredCurrency": {
+            "type": "string"
+          },
+          "acquiredSource": {
+            "type": "string"
+          },
+          "soldAt": {
+            "type": "string"
+          },
+          "soldPriceCents": {
+            "type": "integer"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
       },
       "ProductPatch": {
         "type": "object",
@@ -1025,6 +1183,39 @@
             }
           }
         }
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Build created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Build"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/builds/{id}": {
@@ -1052,6 +1243,232 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Build updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Build"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "slug already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Build deleted; its parts are shelved (status=on_shelf), never deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedAck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/builds/{id}/items": {
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildItemCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Part added to the build",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildItemExpanded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown build or part",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Part is already in another build (one-build-per-part) — body names the current buildId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/builds/{id}/items/{partId}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "partId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Part removed from the build (part itself still exists, now on_shelf)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovedAck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown build, unknown part, or part is not in that build",
             "content": {
               "application/json": {
                 "schema": {
@@ -1101,9 +1518,35 @@
     },
     "/api/v1/parts": {
       "get": {
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/PartStatus"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "buildId",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Parts for the local owner, embedding product",
+            "description": "Parts for the local owner, embedding product; filterable by status/category/buildId",
             "content": {
               "application/json": {
                 "schema": {
@@ -1111,6 +1554,200 @@
                   "items": {
                     "$ref": "#/components/schemas/Part"
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Part created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "productId does not exist for this owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parts/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Part found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Part updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "force",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Part deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedAck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Part is in a build; pass ?force=1 to remove it from the build first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }

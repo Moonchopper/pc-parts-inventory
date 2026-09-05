@@ -91,6 +91,69 @@ export const Part = z
   .openapi('Part');
 export type Part = z.infer<typeof Part>;
 
+/**
+ * Request schemas for the write endpoints (crud-endpoints brief, 2026-09-05) — derived from the
+ * DTOs above minus server fields (`id`, `ownerId`, `createdAt`, `updatedAt`, computed `product`),
+ * plus a few fields that stay server-managed even though they are columns: `identityKey` and
+ * `importId` (owned by the scan importer, D8) on `Part`, and `slug`/`source` on `Build` (`slug` is
+ * generated on create — D7 — and only made user-overridable on PATCH; `source` is fixed to
+ * `'manual'` for API-created builds so only the scan importer can produce a `source: 'scan'` row).
+ * PATCH variants are fully partial — an empty body is a valid no-op 200.
+ */
+export const PartCreate = z
+  .object({
+    productId: z.string(),
+    serial: z.string().optional(),
+    condition: Condition.optional(),
+    quantity: z.number().int().optional(),
+    status: PartStatus.optional(),
+    acquiredAt: z.string().optional(),
+    acquiredPriceCents: z.number().int().optional(),
+    acquiredCurrency: z.string().optional(),
+    acquiredSource: z.string().optional(),
+    soldAt: z.string().optional(),
+    soldPriceCents: z.number().int().optional(),
+    notes: z.string().optional(),
+  })
+  .openapi('PartCreate');
+export type PartCreate = z.infer<typeof PartCreate>;
+
+export const PartPatch = z
+  .object({
+    serial: z.string().optional(),
+    condition: Condition.optional(),
+    quantity: z.number().int().optional(),
+    status: PartStatus.optional(),
+    acquiredAt: z.string().optional(),
+    acquiredPriceCents: z.number().int().optional(),
+    acquiredCurrency: z.string().optional(),
+    acquiredSource: z.string().optional(),
+    soldAt: z.string().optional(),
+    soldPriceCents: z.number().int().optional(),
+    notes: z.string().optional(),
+  })
+  .openapi('PartPatch');
+export type PartPatch = z.infer<typeof PartPatch>;
+
+export const BuildCreate = z
+  .object({
+    name: z.string(),
+    description: z.string().optional(),
+    visibility: Visibility.optional(),
+  })
+  .openapi('BuildCreate');
+export type BuildCreate = z.infer<typeof BuildCreate>;
+
+export const BuildPatch = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    visibility: Visibility.optional(),
+    slug: z.string().optional(),
+  })
+  .openapi('BuildPatch');
+export type BuildPatch = z.infer<typeof BuildPatch>;
+
 export const BuildItem = z
   .object({
     buildId: z.string(),
@@ -100,6 +163,14 @@ export const BuildItem = z
   })
   .openapi('BuildItem');
 export type BuildItem = z.infer<typeof BuildItem>;
+
+export const BuildItemCreate = z
+  .object({
+    partId: z.string(),
+    slot: z.string().optional(),
+  })
+  .openapi('BuildItemCreate');
+export type BuildItemCreate = z.infer<typeof BuildItemCreate>;
 
 export const BuildItemExpanded = BuildItem.extend({
   part: Part,
