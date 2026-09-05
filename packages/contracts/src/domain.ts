@@ -256,6 +256,7 @@ export type Import = z.infer<typeof Import>;
 export const ValuationItem = z
   .object({
     partId: z.string(),
+    quantity: z.number().int(),
     acquiredCents: z.number().int().optional(),
     currentCents: z.number().int().optional(),
     quote: z
@@ -270,14 +271,42 @@ export const ValuationItem = z
   .openapi('ValuationItem');
 export type ValuationItem = z.infer<typeof ValuationItem>;
 
+/**
+ * The like-for-like subset of a `Valuation`: items having *both* a cost basis and a quote.
+ * `deltaCents === currentCents - acquiredCents` holds here and only here — the top-level
+ * `Valuation.acquiredCents`/`currentCents` are sums over different (possibly non-overlapping) item
+ * sets, so a delta over them would not be a delta (architect, 2026-09-05 — D5 no-fallback revision).
+ */
+export const ValuationComparable = z
+  .object({
+    items: z.number().int(),
+    acquiredCents: z.number().int(),
+    currentCents: z.number().int(),
+    deltaCents: z.number().int(),
+    // `null` rather than `0`/`NaN` when `acquiredCents` is 0 — "no comparable spend" and "no change"
+    // are different facts (Task 7 presentation rule: never render a fake percent).
+    deltaPct: z.number().nullable(),
+  })
+  .openapi('ValuationComparable');
+export type ValuationComparable = z.infer<typeof ValuationComparable>;
+
+export const ValuationCoverage = z
+  .object({
+    items: z.number().int(),
+    withAcquired: z.number().int(),
+    withCurrent: z.number().int(),
+  })
+  .openapi('ValuationCoverage');
+export type ValuationCoverage = z.infer<typeof ValuationCoverage>;
+
 export const Valuation = z
   .object({
     buildId: z.string(),
     currency: z.string(),
     acquiredCents: z.number().int(),
     currentCents: z.number().int(),
-    deltaCents: z.number().int(),
-    deltaPct: z.number(),
+    comparable: ValuationComparable,
+    coverage: ValuationCoverage,
     items: z.array(ValuationItem),
   })
   .openapi('Valuation');
@@ -300,12 +329,18 @@ export const SharedBuild = z
     name: z.string(),
     description: z.string().optional(),
     updatedAt: z.string(),
+    // Required (architect, 2026-09-05): governs every cents value in this response — every
+    // `items[].currentCents` and all of `valuation.*` — resolved once, server-side (the owner's
+    // default, `USD` in v1). No per-item currency; mixed-currency builds are a later ADR.
+    currency: z.string().min(1),
     items: z.array(SharedBuildItem),
+    // The ★ subset of `Valuation` (see above) — never `items`, never raw quotes.
     valuation: z
       .object({
         acquiredCents: z.number().int(),
         currentCents: z.number().int(),
-        deltaCents: z.number().int(),
+        comparable: ValuationComparable,
+        coverage: ValuationCoverage,
       })
       .optional(),
   })

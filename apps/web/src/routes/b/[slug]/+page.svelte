@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { formatMoney } from '$lib/money.js';
+  import { valuationCaption } from '@pcpi/contracts';
+  import { formatMoney, formatPercent, formatSignedMoney } from '$lib/money.js';
   import type { PageData } from './$types.js';
 
   let { data }: { data: PageData } = $props();
@@ -9,7 +10,10 @@
   async function copyMarkdown() {
     copyStatus = 'copying';
     try {
-      const res = await fetch('markdown');
+      // Task 8 (architect-directed, 2026-09-05): the generalised same-origin share proxy under
+      // `/api/v1/share/*` replaces this route's own dedicated markdown proxy — one handler for
+      // JSON/.md/card.png instead of three ad hoc ones.
+      const res = await fetch(`/api/v1/share/${encodeURIComponent(data.build.slug)}.md`);
       if (!res.ok) throw new Error(`status ${res.status}`);
       const text = await res.text();
       await navigator.clipboard.writeText(text);
@@ -53,6 +57,7 @@
         <th>Manufacturer</th>
         <th>Model</th>
         <th>Qty</th>
+        <th>Price</th>
       </tr>
     </thead>
     <tbody>
@@ -62,24 +67,48 @@
           <td>{item.manufacturer}</td>
           <td>{item.model}</td>
           <td>{item.quantity}</td>
+          <td>
+            {#if item.currentCents != null}
+              {formatMoney(item.currentCents, data.build.currency)}
+            {:else}
+              —
+            {/if}
+          </td>
         </tr>
       {/each}
     </tbody>
   </table>
 
   {#if data.build.valuation}
+    {@const v = data.build.valuation}
     <p>
-      Acquired: {formatMoney(data.build.valuation.acquiredCents, 'USD')} · Current: {formatMoney(
-        data.build.valuation.currentCents,
-        'USD',
-      )} · Delta: {formatMoney(data.build.valuation.deltaCents, 'USD')}
+      Paid: {formatMoney(v.acquiredCents, data.build.currency)} · Now: {formatMoney(
+        v.currentCents,
+        data.build.currency,
+      )} ·
+      {#if v.comparable.items === 0}
+        Δ: —
+      {:else}
+        Δ: {formatSignedMoney(v.comparable.deltaCents, data.build.currency)}{v.comparable.deltaPct !=
+        null
+          ? ` (${formatPercent(v.comparable.deltaPct)})`
+          : ''}
+      {/if}
     </p>
+    <p class="coverage-caption">{valuationCaption(v)}</p>
   {/if}
 
   <p>
     <button type="button" onclick={copyMarkdown}>{copyLabel}</button>
   </p>
   <noscript>
-    <p><a href="markdown">View as Markdown</a></p>
+    <p><a href="/api/v1/share/{data.build.slug}.md">View as Markdown</a></p>
   </noscript>
 </article>
+
+<style>
+  .coverage-caption {
+    font-size: 0.85rem;
+    color: var(--muted-text-color, #666);
+  }
+</style>

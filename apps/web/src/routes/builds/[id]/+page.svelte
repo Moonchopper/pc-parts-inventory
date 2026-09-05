@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { deltaClass, formatMoney, formatPercent } from '$lib/money.js';
+  import { valuationCaption } from '@pcpi/contracts';
+  import { deltaClass, formatMoney, formatPercent, formatSignedMoney } from '$lib/money.js';
   import type { ActionData, PageData } from './$types.js';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -80,17 +81,20 @@
 
 <h2>Valuation</h2>
 {#if data.valuation}
+  {@const v = data.valuation}
   <p>
-    Acquired: {formatMoney(data.valuation.acquiredCents, data.valuation.currency)} · Current: {formatMoney(
-      data.valuation.currentCents,
-      data.valuation.currency,
-    )} ·
-    <span class={deltaClass(data.valuation.deltaCents)}>
-      Delta: {formatMoney(data.valuation.deltaCents, data.valuation.currency)} ({formatPercent(
-        data.valuation.deltaPct,
-      )})
-    </span>
+    Paid: {formatMoney(v.acquiredCents, v.currency)} · Now: {formatMoney(v.currentCents, v.currency)} ·
+    {#if v.comparable.items === 0}
+      <span class="delta-flat">Δ: —</span>
+    {:else}
+      <span class={deltaClass(v.comparable.deltaCents)}>
+        Δ: {formatSignedMoney(v.comparable.deltaCents, v.currency)}{v.comparable.deltaPct != null
+          ? ` (${formatPercent(v.comparable.deltaPct)})`
+          : ''}
+      </span>
+    {/if}
   </p>
+  <p class="coverage-caption">{valuationCaption(v)}</p>
 {:else}
   <p>Valuation unavailable.</p>
 {/if}
@@ -108,5 +112,10 @@
     flex-direction: column;
     gap: 0.25rem;
     font-size: 0.9rem;
+  }
+
+  .coverage-caption {
+    font-size: 0.85rem;
+    color: var(--muted-text-color, #666);
   }
 </style>

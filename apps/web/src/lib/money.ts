@@ -7,6 +7,12 @@ export function formatMoney(cents: number, currency: string): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 }
 
+/** `+$149.98` / `-$149.98` / `$0.00` (no sign for exactly zero) — for a Δ figure, never a plain total. */
+export function formatSignedMoney(cents: number, currency: string): string {
+  const sign = cents > 0 ? '+' : cents < 0 ? '-' : '';
+  return `${sign}${formatMoney(Math.abs(cents), currency)}`;
+}
+
 export type DeltaDirection = 'positive' | 'negative' | 'flat';
 
 /** Sign of a delta in cents — positive means the build is worth more now than acquired. */

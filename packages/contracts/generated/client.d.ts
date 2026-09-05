@@ -1511,12 +1511,25 @@ export interface components {
             currency: string;
             acquiredCents: number;
             currentCents: number;
-            deltaCents: number;
-            deltaPct: number;
+            comparable: components["schemas"]["ValuationComparable"];
+            coverage: components["schemas"]["ValuationCoverage"];
             items: components["schemas"]["ValuationItem"][];
+        };
+        ValuationComparable: {
+            items: number;
+            acquiredCents: number;
+            currentCents: number;
+            deltaCents: number;
+            deltaPct: number | null;
+        };
+        ValuationCoverage: {
+            items: number;
+            withAcquired: number;
+            withCurrent: number;
         };
         ValuationItem: {
             partId: string;
+            quantity: number;
             acquiredCents?: number;
             currentCents?: number;
             quote?: {
@@ -1602,11 +1615,13 @@ export interface components {
             name: string;
             description?: string;
             updatedAt: string;
+            currency: string;
             items: components["schemas"]["SharedBuildItem"][];
             valuation?: {
                 acquiredCents: number;
                 currentCents: number;
-                deltaCents: number;
+                comparable: components["schemas"]["ValuationComparable"];
+                coverage: components["schemas"]["ValuationCoverage"];
             };
         };
         SharedBuildItem: {

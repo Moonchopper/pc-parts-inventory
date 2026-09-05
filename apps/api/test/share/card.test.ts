@@ -1,4 +1,9 @@
-import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
+import type {
+  SharedBuild,
+  SharedBuildItem,
+  ValuationComparable,
+  ValuationCoverage,
+} from '@pcpi/contracts';
 import { describe, expect, it } from 'vitest';
 import { buildCardSvg, buildCardTree, renderCardPng } from '../../src/share/card.js';
 import { cardETag } from '../../src/share/etag.js';
@@ -21,9 +26,25 @@ function build(overrides: Partial<SharedBuild> = {}): SharedBuild {
     slug: 'abc123defg',
     name: 'MOONPC',
     updatedAt: '2026-09-01T00:00:00.000Z',
+    currency: 'USD',
     items: [item()],
     ...overrides,
   };
+}
+
+function comparable(overrides: Partial<ValuationComparable> = {}): ValuationComparable {
+  return {
+    items: 1,
+    acquiredCents: 0,
+    currentCents: 0,
+    deltaCents: 0,
+    deltaPct: null,
+    ...overrides,
+  };
+}
+
+function coverage(overrides: Partial<ValuationCoverage> = {}): ValuationCoverage {
+  return { items: 1, withAcquired: 1, withCurrent: 1, ...overrides };
 }
 
 function nItems(n: number): SharedBuildItem[] {
@@ -80,6 +101,134 @@ describe('buildCardTree', () => {
   });
 });
 
+describe('buildCardTree — currency (Task 1/2, architect 2026-09-05)', () => {
+  it('renders item prices and the Paid/Now line with a non-USD currency, never a hardcoded $', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          currency: 'EUR',
+          items: [item({ currentCents: 123456 })],
+          valuation: {
+            acquiredCents: 100000,
+            currentCents: 123456,
+            comparable: comparable({
+              acquiredCents: 100000,
+              currentCents: 123456,
+              deltaCents: 23456,
+              deltaPct: 23.5,
+            }),
+            coverage: coverage(),
+          },
+        }),
+      ),
+    );
+    expect(texts.some((t) => t.includes('€1,234.56'))).toBe(true);
+    expect(texts.some((t) => t.includes('Paid €1,000.00'))).toBe(true);
+    expect(texts.some((t) => t.includes('$'))).toBe(false);
+  });
+});
+
+describe('buildCardTree — Paid/Now/Δ + the shared explanatory caption (Task 7 presentation, revised 2026-09-05)', () => {
+  it('shows the "Δ over the n parts…" caption, wrapped to its expected 2 lines, when some items are comparable', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 175000,
+            currentCents: 189998,
+            comparable: comparable({
+              items: 2,
+              acquiredCents: 175000,
+              currentCents: 189998,
+              deltaCents: 14998,
+              deltaPct: 8.6,
+            }),
+            coverage: coverage({ items: 3, withAcquired: 2, withCurrent: 2 }),
+          },
+        }),
+      ),
+    );
+    // `valuationCaption` (`@pcpi/contracts`) produces one sentence; `wrapCaptionLines` (card.ts)
+    // splits it deterministically at a word boundary — asserted here as the exact two lines it
+    // must produce for this input, not a substring match, since the split point is load-bearing
+    // for the clipping fix (the footer layout budgets exactly 2 caption lines).
+    expect(texts).toContain('Now covers 2 of 3 parts · delta over the 2 parts with');
+    expect(texts).toContain('both a cost basis and a price');
+    expect(texts.every((t) => !t.includes('Δ'))).toBe(true);
+    expect(texts.some((t) => t.includes('Paid $1,750.00'))).toBe(true);
+    expect(texts.some((t) => t.includes('Now $1,899.98'))).toBe(true);
+  });
+
+  it('caption reads "no part has both…" (1 line) when nothing is comparable but some parts are priced', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 0,
+            currentCents: 6000,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 6, withAcquired: 0, withCurrent: 5 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('Now covers 5 of 6 parts · no part has both a cost basis');
+    expect(texts).toContain('and a price yet');
+  });
+
+  it('caption reads "No prices yet…" (single line, no wrap) when coverage.withCurrent is 0', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 5000,
+            currentCents: 0,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ items: 6, withAcquired: 1, withCurrent: 0 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('No prices yet · add a provider or refresh');
+  });
+
+  it('renders Δ as an em dash — never 0 or +0.0% — when comparable.items is 0', () => {
+    const texts = collectText(
+      buildCardTree(
+        build({
+          valuation: {
+            acquiredCents: 0,
+            currentCents: 6000,
+            comparable: comparable({
+              items: 0,
+              acquiredCents: 0,
+              currentCents: 0,
+              deltaCents: 0,
+              deltaPct: null,
+            }),
+            coverage: coverage({ withAcquired: 0, withCurrent: 1 }),
+          },
+        }),
+      ),
+    );
+    expect(texts).toContain('—');
+    expect(texts.some((t) => t.includes('+0.0%'))).toBe(false);
+    expect(texts.some((t) => t === '0' || t === '+$0.00')).toBe(false);
+  });
+});
+
 describe('renderCardPng', () => {
   it('renders a real PNG (magic bytes) over 10000 bytes for the standard fixture', async () => {
     const png = await renderCardPng(
@@ -105,7 +254,18 @@ describe('renderCardPng', () => {
             currentCents: 18999,
           }),
         ],
-        valuation: { acquiredCents: 175000, currentCents: 189998, deltaCents: 14998 },
+        valuation: {
+          acquiredCents: 175000,
+          currentCents: 189998,
+          comparable: comparable({
+            items: 3,
+            acquiredCents: 175000,
+            currentCents: 189998,
+            deltaCents: 14998,
+            deltaPct: 8.6,
+          }),
+          coverage: coverage({ items: 3, withAcquired: 3, withCurrent: 3 }),
+        },
       }),
     );
     expect(png.subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
@@ -136,12 +296,38 @@ describe('renderCardPng', () => {
 
   it('colors the delta green when value went up and red when it went down (SVG fill attributes survive glyph-baking)', async () => {
     const up = await buildCardSvg(
-      build({ valuation: { acquiredCents: 1000, currentCents: 1500, deltaCents: 500 } }),
+      build({
+        valuation: {
+          acquiredCents: 1000,
+          currentCents: 1500,
+          comparable: comparable({
+            items: 1,
+            acquiredCents: 1000,
+            currentCents: 1500,
+            deltaCents: 500,
+            deltaPct: 50,
+          }),
+          coverage: coverage(),
+        },
+      }),
     );
     expect(up).toContain('#4ade80');
 
     const down = await buildCardSvg(
-      build({ valuation: { acquiredCents: 1500, currentCents: 1000, deltaCents: -500 } }),
+      build({
+        valuation: {
+          acquiredCents: 1500,
+          currentCents: 1000,
+          comparable: comparable({
+            items: 1,
+            acquiredCents: 1500,
+            currentCents: 1000,
+            deltaCents: -500,
+            deltaPct: -33.3,
+          }),
+          coverage: coverage(),
+        },
+      }),
     );
     expect(down).toContain('#f87171');
   });

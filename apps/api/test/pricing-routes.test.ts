@@ -272,7 +272,10 @@ describe('GET /api/v1/builds/{id}/valuation (D5)', () => {
 
     expect(valuation.acquiredCents).toBe(10000);
     expect(valuation.currentCents).toBe(9000); // used_market wins D5 precedence
-    expect(valuation.deltaCents).toBe(valuation.currentCents - valuation.acquiredCents);
+    expect(valuation.comparable.items).toBe(1);
+    expect(valuation.comparable.deltaCents).toBe(
+      valuation.comparable.currentCents - valuation.comparable.acquiredCents,
+    );
     expect(valuation.items[0].quote.kind).toBe('used_market');
   });
 

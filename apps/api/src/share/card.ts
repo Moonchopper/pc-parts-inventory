@@ -1,10 +1,11 @@
 import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
+import { valuationCaption } from '@pcpi/contracts';
 import { Resvg } from '@resvg/resvg-js';
 import satori from 'satori';
 import { categoryLabel } from './category-labels.js';
 import { loadCardFonts } from './fonts.js';
 import { itemDisplayName } from './item-name.js';
-import { deltaPercent, formatCents, formatSignedCents, formatSignedPercent } from './money.js';
+import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';
 import { truncate } from './text.js';
 
 export const CARD_WIDTH = 1200;
@@ -13,6 +14,15 @@ export const CARD_HEIGHT = 630;
 const MAX_ITEMS_SHOWN = 8;
 const NAME_MAX_CHARS = 40;
 const ITEM_NAME_MAX_CHARS = 56;
+/**
+ * PM-flagged clipping fix (2026-09-05): the caption under Paid/Now/Δ is now a full sentence
+ * (`valuationCaption`, `@pcpi/contracts`), long enough to need wrapping. We hand-wrap in JS — same
+ * reasoning as `truncate()` below: never rely on satori's own text layout for sizing, because
+ * satori bakes the SVG at whatever width the text naturally takes and clips at the canvas edge
+ * rather than reflowing, so *we* must be the ones deciding where lines break. Capped at 2 lines
+ * unconditionally; the footer layout budgets exactly that many (see `valuationSummary`).
+ */
+const CAPTION_MAX_CHARS_PER_LINE = 55;
 
 const COLOR_BG = '#0b1220';
 const COLOR_DIVIDER = '#1f2937';
@@ -63,7 +73,7 @@ function categoryBadge(category: SharedBuildItem['category']): CardNode {
   );
 }
 
-function itemRow(item: SharedBuildItem): CardNode {
+function itemRow(item: SharedBuildItem, currency: string): CardNode {
   return div(
     {
       display: 'flex',
@@ -81,7 +91,7 @@ function itemRow(item: SharedBuildItem): CardNode {
           color: COLOR_TEXT,
         }),
       ]),
-      text(item.currentCents != null ? formatCents(item.currentCents) : '—', {
+      text(item.currentCents != null ? formatCents(item.currentCents, currency) : '—', {
         fontSize: 22,
         fontWeight: 400,
         color: COLOR_MUTED,
@@ -90,6 +100,33 @@ function itemRow(item: SharedBuildItem): CardNode {
   );
 }
 
+/**
+ * Splits `valuationCaption`'s sentence into at most 2 lines, breaking at the last space at-or-
+ * before the limit so no word is ever cut mid-token (falls back to a hard break only if there is
+ * no earlier space — never happens for the fixed vocabulary `valuationCaption` produces, but the
+ * cap holds regardless). Always returns 1 or 2 lines, never more — the footer layout below budgets
+ * exactly that many.
+ */
+function wrapCaptionLines(caption: string): string[] {
+  if (caption.length <= CAPTION_MAX_CHARS_PER_LINE) return [caption];
+  const breakAt = caption.lastIndexOf(' ', CAPTION_MAX_CHARS_PER_LINE);
+  const splitIndex = breakAt > 0 ? breakAt : CAPTION_MAX_CHARS_PER_LINE;
+  return [caption.slice(0, splitIndex).trimEnd(), caption.slice(splitIndex).trimStart()];
+}
+
+/**
+ * Task 7 presentation rule, revised 2026-09-05 (architect, presentation-only): Paid / Now / Δ,
+ * unchanged, plus an explanatory caption from `valuationCaption` (`@pcpi/contracts` — the single
+ * source shared with the Markdown export, the share page and the build page, so the wording can
+ * never drift between surfaces). Δ renders `—` (never `0`/`+0.0%`) when `comparable.items === 0` —
+ * "no comparable items" and "no change" are different facts, and conflating them was the original
+ * fallback bug in another costume.
+ *
+ * PM-flagged clipping fix: the Paid/Now/Δ row and the (now up to 2-line) caption must both sit
+ * inside the 630px card's 48px padding box. `buildCardTree` trims the items column's own padding
+ * and gaps to make room; this function keeps its own internal gap tight (4px) rather than the
+ * looser 6px it used when the caption was a single short line.
+ */
 function valuationSummary(build: SharedBuild): CardNode {
   if (!build.valuation) {
     return text('Valuation not available yet', {
@@ -99,23 +136,43 @@ function valuationSummary(build: SharedBuild): CardNode {
     });
   }
 
-  const { acquiredCents, currentCents, deltaCents } = build.valuation;
-  const pct = deltaPercent(acquiredCents, deltaCents);
-  const deltaColor = deltaCents > 0 ? COLOR_UP : deltaCents < 0 ? COLOR_DOWN : COLOR_MUTED;
-  const deltaText =
-    pct != null
-      ? `${formatSignedCents(deltaCents)} (${formatSignedPercent(pct)})`
-      : formatSignedCents(deltaCents);
+  const { acquiredCents, currentCents, comparable } = build.valuation;
+  const hasComparable = comparable.items > 0;
+  const deltaColor = !hasComparable
+    ? COLOR_MUTED
+    : comparable.deltaCents > 0
+      ? COLOR_UP
+      : comparable.deltaCents < 0
+        ? COLOR_DOWN
+        : COLOR_MUTED;
+  const deltaText = !hasComparable
+    ? '—'
+    : comparable.deltaPct != null
+      ? `${formatSignedCents(comparable.deltaCents, build.currency)} (${formatSignedPercent(comparable.deltaPct)})`
+      : formatSignedCents(comparable.deltaCents, build.currency);
 
-  return div({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16 }, [
-    text(`Paid ${formatCents(acquiredCents)}`, {
-      fontSize: 22,
-      fontWeight: 400,
-      color: COLOR_MUTED,
-    }),
-    text('→', { fontSize: 22, fontWeight: 400, color: COLOR_FAINT }),
-    text(`Now ${formatCents(currentCents)}`, { fontSize: 22, fontWeight: 700, color: COLOR_TEXT }),
-    text(deltaText, { fontSize: 22, fontWeight: 700, color: deltaColor }),
+  return div({ display: 'flex', flexDirection: 'column', gap: 4 }, [
+    div({ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 16 }, [
+      text(`Paid ${formatCents(acquiredCents, build.currency)}`, {
+        fontSize: 22,
+        fontWeight: 400,
+        color: COLOR_MUTED,
+      }),
+      // Plain middle dot, not an arrow glyph (`→`, U+2192): the embedded Inter subset
+      // (`apps/api/assets`) has no glyph for it, and satori/resvg render the gap as a tofu box
+      // instead of failing loudly — invisible until this brief actually populated `valuation` for
+      // the first time. `·` is already proven safe elsewhere on this card ("Shared build · slug").
+      text('·', { fontSize: 22, fontWeight: 400, color: COLOR_FAINT }),
+      text(`Now ${formatCents(currentCents, build.currency)}`, {
+        fontSize: 22,
+        fontWeight: 700,
+        color: COLOR_TEXT,
+      }),
+      text(deltaText, { fontSize: 22, fontWeight: 700, color: deltaColor }),
+    ]),
+    ...wrapCaptionLines(valuationCaption(build.valuation)).map((line) =>
+      text(line, { fontSize: 14, fontWeight: 400, color: COLOR_FAINT }),
+    ),
   ]);
 }
 
@@ -133,14 +190,18 @@ export function buildCardTree(build: SharedBuild): CardNode {
     {
       display: 'flex',
       flexDirection: 'column',
-      gap: 14,
+      // PM-flagged clipping fix (2026-09-05): trimmed from 14/8/8 to make room for the footer
+      // caption's second line (`valuationCaption`, now a full sentence) without shrinking the
+      // card or dropping below `MAX_ITEMS_SHOWN` — a few px of item leading, invisible on its own,
+      // reclaimed rather than clipping the caption's descenders at the bottom edge.
+      gap: 12,
       flexGrow: 1,
       width: '100%',
-      paddingTop: 8,
-      paddingBottom: 8,
+      paddingTop: 4,
+      paddingBottom: 4,
     },
     [
-      ...items.map(itemRow),
+      ...items.map((item) => itemRow(item, build.currency)),
       ...(overflow > 0
         ? [text(`+${overflow} more`, { fontSize: 20, fontWeight: 400, color: COLOR_FAINT })]
         : []),
@@ -181,7 +242,11 @@ export function buildCardTree(build: SharedBuild): CardNode {
     {
       display: 'flex',
       flexDirection: 'row',
-      alignItems: 'center',
+      // `flex-end` (not `center`): `valuationSummary` can now be up to 3 lines tall (Paid/Now/Δ +
+      // a 2-line caption), so bottom-anchoring keeps "Shared build · slug" sitting on the same
+      // baseline as the caption's last line instead of floating at the vertical middle of a block
+      // that grew taller than it.
+      alignItems: 'flex-end',
       justifyContent: 'space-between',
       width: '100%',
     },
@@ -198,7 +263,10 @@ export function buildCardTree(build: SharedBuild): CardNode {
       width: CARD_WIDTH,
       height: CARD_HEIGHT,
       padding: 48,
-      gap: 20,
+      // PM-flagged clipping fix (2026-09-05): 20 -> 16 between header/divider/items/footer, one of
+      // several small reclaims (see `itemsColumn` and `valuationSummary`) that together make room
+      // for the footer caption's second line without touching `MAX_ITEMS_SHOWN` or the card size.
+      gap: 16,
       backgroundColor: COLOR_BG,
       fontFamily: 'Inter',
     },

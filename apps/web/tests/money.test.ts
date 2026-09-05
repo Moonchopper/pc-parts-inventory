@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { deltaClass, deltaDirection, formatMoney, formatPercent } from '../src/lib/money.js';
+import {
+  deltaClass,
+  deltaDirection,
+  formatMoney,
+  formatPercent,
+  formatSignedMoney,
+} from '../src/lib/money.js';
 
 describe('formatMoney', () => {
   it('formats positive minor units as major-unit currency', () => {
@@ -16,6 +22,18 @@ describe('formatMoney', () => {
 
   it('respects a different ISO-4217 currency', () => {
     expect(formatMoney(1000, 'EUR')).toBe('€10.00');
+  });
+});
+
+describe('formatSignedMoney', () => {
+  it('prefixes a rise with + and a drop with -', () => {
+    expect(formatSignedMoney(14998, 'USD')).toBe('+$149.98');
+    expect(formatSignedMoney(-14998, 'USD')).toBe('-$149.98');
+    expect(formatSignedMoney(0, 'USD')).toBe('$0.00');
+  });
+
+  it('respects a different ISO-4217 currency', () => {
+    expect(formatSignedMoney(1000, 'EUR')).toBe('+€10.00');
   });
 });
 
