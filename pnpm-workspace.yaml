@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - hono@4.13.7
+
+onlyBuiltDependencies:
+  - better-sqlite3

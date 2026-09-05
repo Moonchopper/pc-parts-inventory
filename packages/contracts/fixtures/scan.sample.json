@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "scanner": {
+    "name": "pcpi-scan",
+    "version": "0.1.0",
+    "os": "windows"
+  },
+  "host": {
+    "hostname": "SEEDPC-01",
+    "scannedAt": "2026-09-01T12:00:00Z"
+  },
+  "components": [
+    {
+      "category": "cpu",
+      "manufacturer": "AMD",
+      "model": "Ryzen 9 7900X",
+      "partNumber": "100-100000589WOF",
+      "serial": null,
+      "quantity": 1,
+      "specs": { "cores": 12, "threads": 24, "maxClockMHz": 5600, "socket": "AM5" }
+    },
+    {
+      "category": "gpu",
+      "manufacturer": "NVIDIA",
+      "model": "GeForce RTX 4070",
+      "serial": "GPU-SN-0001",
+      "quantity": 1,
+      "specs": { "vramMB": 12288, "driverVersion": "560.94" }
+    },
+    {
+      "category": "memory",
+      "manufacturer": "Corsair",
+      "model": "Vengeance DDR5",
+      "partNumber": "CMK32GX5M2B5200C40",
+      "serial": "MEM-SN-AAA",
+      "slot": "DIMM_A1",
+      "quantity": 1,
+      "specs": { "capacityMB": 16384, "speedMT": 5200, "formFactor": "DIMM" }
+    },
+    {
+      "category": "memory",
+      "manufacturer": "Corsair",
+      "model": "Vengeance DDR5",
+      "partNumber": "CMK32GX5M2B5200C40",
+      "serial": "MEM-SN-BBB",
+      "slot": "DIMM_A2",
+      "quantity": 1,
+      "specs": { "capacityMB": 16384, "speedMT": 5200, "formFactor": "DIMM" }
+    },
+    {
+      "category": "storage",
+      "manufacturer": "Samsung",
+      "model": "980 PRO 1TB",
+      "partNumber": "MZ-V8P1T0B",
+      "serial": "STORAGE-SN-0001",
+      "quantity": 1,
+      "specs": {
+        "capacityBytes": 1000204886016,
+        "bus": "NVMe",
+        "mediaType": "SSD",
+        "firmware": "5B2QGXA7"
+      }
+    },
+    {
+      "category": "motherboard",
+      "manufacturer": "ASUS",
+      "model": "ROG STRIX B650E-F GAMING WIFI",
+      "serial": "Default string",
+      "quantity": 1,
+      "specs": { "biosVersion": "1621", "chipset": "B650E" }
+    },
+    {
+      "category": "psu",
+      "manufacturer": "Corsair",
+      "model": "RM850x",
+      "serial": "None",
+      "quantity": 1,
+      "specs": {}
+    }
+  ]
+}
