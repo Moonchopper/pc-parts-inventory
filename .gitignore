@@ -1,0 +1,10 @@
+artifacts/
+*.db
+*.db-*
+.env
+.env.*
+bin/
+obj/
+node_modules/
+.vs/
+.idea/
