@@ -1,8 +1,7 @@
 import type { SharedBuild, SharedBuildItem } from '@pcpi/contracts';
-import { valuationCaption } from '@pcpi/contracts';
+import { categoryLabel, valuationCaption } from '@pcpi/contracts';
 import { Resvg } from '@resvg/resvg-js';
 import satori from 'satori';
-import { categoryLabel } from './category-labels.js';
 import { loadCardFonts } from './fonts.js';
 import { itemDisplayName } from './item-name.js';
 import { formatCents, formatSignedCents, formatSignedPercent } from './money.js';

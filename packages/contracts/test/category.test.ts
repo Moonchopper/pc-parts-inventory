@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, categoryOrder, compareByCategoryOrder } from '../src/category.js';
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  categoryLabel,
+  categoryOrder,
+  compareByCategoryOrder,
+} from '../src/category.js';
+
+describe('CATEGORY_LABELS', () => {
+  it('covers every §3 CATEGORIES member with a non-empty, human-readable label', () => {
+    for (const category of CATEGORIES) {
+      const label = categoryLabel(category);
+      expect(label, `category "${category}" has no label`).toBeTypeOf('string');
+      expect(label.length, `category "${category}" has an empty label`).toBeGreaterThan(0);
+      expect(label, `category "${category}" rendered its own enum key back unlabeled`).not.toBe(
+        'undefined',
+      );
+    }
+  });
+
+  it('has exactly one entry per CATEGORIES member (no stragglers, nothing missing)', () => {
+    expect(Object.keys(CATEGORY_LABELS).sort()).toEqual([...CATEGORIES].sort());
+  });
+
+  it('renders PCPartPicker-style names for the trickier categories', () => {
+    expect(categoryLabel('gpu')).toBe('Video Card');
+    expect(categoryLabel('cpu_cooler')).toBe('CPU Cooler');
+    expect(categoryLabel('psu')).toBe('Power Supply');
+    expect(categoryLabel('case_fan')).toBe('Case Fan');
+  });
+});
 
 describe('categoryOrder', () => {
   it('agrees member-for-member with CATEGORIES declaration order (derived, not a second literal)', () => {

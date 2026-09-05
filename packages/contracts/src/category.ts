@@ -23,6 +23,34 @@ export const Category = z.enum(CATEGORIES).openapi('Category');
 export type Category = z.infer<typeof Category>;
 
 /**
+ * Human-readable labels for the §3 `Category` enum (PCPartPicker-style naming) — the one place
+ * this map lives, shared by the API (Markdown table, PNG card) and the web app so neither can
+ * silently render a category as its raw enum key (`gpu`) instead of its display name
+ * (`Video Card`). A unit test walks the full §3 `CATEGORIES` tuple against this map.
+ */
+export const CATEGORY_LABELS: Record<Category, string> = {
+  cpu: 'CPU',
+  cpu_cooler: 'CPU Cooler',
+  motherboard: 'Motherboard',
+  memory: 'Memory',
+  storage: 'Storage',
+  gpu: 'Video Card',
+  case: 'Case',
+  psu: 'Power Supply',
+  case_fan: 'Case Fan',
+  monitor: 'Monitor',
+  os: 'OS',
+  keyboard: 'Keyboard',
+  mouse: 'Mouse',
+  headset: 'Headset',
+  other: 'Other',
+};
+
+export function categoryLabel(category: Category): string {
+  return CATEGORY_LABELS[category];
+}
+
+/**
  * M0-seed.md §4 — deterministic share/build item order (architect-directed, 2026-09-05): category,
  * in this display order, then manufacturer, then model, then quantity descending. Derived from
  * `CATEGORIES`'s own declaration order (an index lookup) rather than a second hand-typed list, so
