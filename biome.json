@@ -15,7 +15,8 @@
       "!**/openapi.json",
       "!**/artifacts",
       "!**/*.tsbuildinfo",
-      "!pnpm-lock.yaml"
+      "!pnpm-lock.yaml",
+      "!tools/scanner/fixtures"
     ]
   },
   "formatter": {
