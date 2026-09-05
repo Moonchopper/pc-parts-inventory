@@ -62,11 +62,13 @@ $script:PlaceholderSerials = @(
 function Clean-Serial {
     <#
         .SYNOPSIS
-        Normalizes a raw CIM serial-ish value: trims it, and returns $null for placeholder
-        values (vendor defaults, "Unknown", "0", all-zero strings) instead of the placeholder.
-        Never fabricates a value — a real, non-placeholder string is returned trimmed but
-        otherwise unmodified (embedded separators like the storage disk's trailing dot and
-        underscores are left alone; they are real serial characters, not noise).
+        Normalizes a raw CIM serial-ish value: trims whitespace, strips trailing punctuation
+        CIM sometimes appends (a stray '.'/','/';'), and returns $null for placeholder values
+        (vendor defaults, "Unknown", "0", all-zero strings) instead of the placeholder. Never
+        fabricates a value — a real, non-placeholder string is returned unmodified apart from
+        the above (embedded separators like the storage disk's internal underscores are left
+        alone; they are real serial characters, not noise). Leading punctuation is never
+        stripped.
     #>
     param(
         [Parameter(Mandatory = $false)]
@@ -77,11 +79,18 @@ function Clean-Serial {
     $trimmed = $Value.Trim()
     if ($trimmed -eq '') { return $null }
 
+    # Strip a trailing run of '.'/','/';' (e.g. this milestone's NVMe serial, which CIM reports
+    # as "...E87F_6C0C." with a stray trailing dot that is not part of the real serial), then
+    # re-trim and re-test for empty so a value that is nothing but punctuation (e.g. ".") ends
+    # up $null, not ''.
+    $trimmed = $trimmed.TrimEnd('.', ',', ';').Trim()
+    if ($trimmed -eq '') { return $null }
+
     $normalized = $trimmed.ToLowerInvariant()
     if ($script:PlaceholderSerials -contains $normalized) { return $null }
 
     # All-zero once separators are stripped (e.g. "0000-0000", "0000_0000") is still a
-    # placeholder. A real serial like "0000_0000_0000_0001_00A0_7523_E87F_6C0C." contains
+    # placeholder. A real serial like "0000_0000_0000_0001_00A0_7523_E87F_6C0C" contains
     # non-zero hex digits after stripping and survives this check untouched.
     $alnumOnly = $trimmed -replace '[^0-9A-Za-z]', ''
     if ($alnumOnly -ne '' -and ($alnumOnly -replace '0', '') -eq '') { return $null }

@@ -7,7 +7,7 @@
                 },
     "host":  {
                  "hostname":  "MOONPC",
-                 "scannedAt":  "2026-09-05T15:42:55.5347730Z"
+                 "scannedAt":  "2026-09-05T21:53:39.6003662Z"
              },
     "components":  [
                        {
@@ -81,7 +81,7 @@
                            "category":  "storage",
                            "manufacturer":  "Crucial",
                            "model":  "CT2000T700SSD5",
-                           "serial":  "74a52495955c",
+                           "serial":  "f212d6bf264f",
                            "quantity":  1,
                            "specs":  {
                                          "capacityBytes":  2000398934016,

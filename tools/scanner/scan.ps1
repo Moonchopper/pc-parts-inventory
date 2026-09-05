@@ -113,7 +113,10 @@ function Invoke-SelfTest {
     Test-Eq (Clean-Serial $null) $null 'Clean-Serial: $null -> null'
     Test-Eq (Clean-Serial '00000000') $null 'Clean-Serial: all-zero string -> null'
     Test-Eq (Clean-Serial '055D00F7') '055D00F7' 'Clean-Serial: real serial survives'
-    Test-Eq (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C.') '0000_0000_0000_0001_00A0_7523_E87F_6C0C.' 'Clean-Serial: real serial with separators/trailing dot survives (not all-zero)'
+    Test-Eq (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C.') '0000_0000_0000_0001_00A0_7523_E87F_6C0C' 'Clean-Serial: real serial with trailing dot has the dot stripped (not all-zero)'
+    Test-Eq (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C,') '0000_0000_0000_0001_00A0_7523_E87F_6C0C' 'Clean-Serial: real serial with trailing comma has the comma stripped'
+    Test-Eq (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C;') '0000_0000_0000_0001_00A0_7523_E87F_6C0C' 'Clean-Serial: real serial with trailing semicolon has the semicolon stripped'
+    Test-Eq (Clean-Serial '.') $null 'Clean-Serial: "." only -> null (trailing punctuation strip leaves nothing)'
 
     # 3. Manufacturer cleanup: (R)/(TM)/Corporation/Ltd. stripping.
     Test-Eq (Clean-Manufacturer 'Gigabyte Technology Co., Ltd.') 'Gigabyte' 'Clean-Manufacturer strips "Technology Co., Ltd."'

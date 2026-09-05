@@ -68,8 +68,10 @@ Cleanup applied to every value (see `ScanLib.ps1` for the exact rules and their 
   (`Clean-Manufacturer`) — e.g. `"Gigabyte Technology Co., Ltd."` → `Gigabyte`.
 - Placeholder serials (`"Default string"`, `"To Be Filled By O.E.M."`, `"None"`,
   `"System Serial Number"`, `"Unknown"`, `"0"`, all-zero strings, empty) become `null`, never the
-  placeholder text (`Clean-Serial`). A real serial (even one with underscores or a trailing dot,
-  like this machine's NVMe drive) is left exactly as reported.
+  placeholder text (`Clean-Serial`). Trailing punctuation (`.`, `,`, `;`) that CIM sometimes
+  appends — like this machine's NVMe drive, which reports a stray trailing dot — is stripped;
+  a real serial is otherwise left exactly as reported (internal separators like underscores are
+  untouched, and leading punctuation is never stripped).
 - `Win32_VideoController.AdapterRAM` is a **uint32 that wraps** above ~4 GB — `scan.ps1` never
   publishes it. Instead it reads the true size from
   `HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\<NNNN>\HardwareInformation.qwMemorySize`,

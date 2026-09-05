@@ -50,8 +50,20 @@ Describe 'Clean-Serial' {
         (Clean-Serial '055D00F7') | Should Be '055D00F7'
     }
 
-    It 'leaves a real serial with underscores and a trailing dot untouched (not all-zero)' {
-        (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C.') | Should Be '0000_0000_0000_0001_00A0_7523_E87F_6C0C.'
+    It 'strips a trailing dot from a real serial with underscores (not all-zero)' {
+        (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C.') | Should Be '0000_0000_0000_0001_00A0_7523_E87F_6C0C'
+    }
+
+    It 'strips a trailing comma from a real serial' {
+        (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C,') | Should Be '0000_0000_0000_0001_00A0_7523_E87F_6C0C'
+    }
+
+    It 'strips a trailing semicolon from a real serial' {
+        (Clean-Serial '0000_0000_0000_0001_00A0_7523_E87F_6C0C;') | Should Be '0000_0000_0000_0001_00A0_7523_E87F_6C0C'
+    }
+
+    It 'maps "." only to $null (trailing punctuation strip leaves nothing)' {
+        (Clean-Serial '.') | Should Be $null
     }
 }
 
