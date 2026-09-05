@@ -175,3 +175,24 @@ script skipped and rely on the shipped prebuild. **Do not** solve it by adding a
 Whichever you pick, prove it with a `docker compose build` tail and a working `/health` from the container.
 You may edit `pnpm-workspace.yaml` **only** if option (b) requires it — say so loudly in your report if you do,
 since it is otherwise outside your Scope.
+
+---
+
+## PM addendum 2 (2026-09-05, a real bug found by W0.4 — fix it in `compose.yaml`)
+
+**`@sveltejs/adapter-node` defaults the origin scheme to `https` when neither `ORIGIN` nor a trusted
+`PROTOCOL_HEADER` is set** (see `get_origin` in the adapter's `files/handler.js`). W0.4 found this while building
+the share page and worked around it in its harness check by setting `ORIGIN` explicitly on the spawned web server.
+
+**Why it matters to you specifically:** the share page builds `og:url` and `og:image` from the request origin.
+In the container, served over plain HTTP on `localhost:5173`, an unset `ORIGIN` makes both tags claim `https://…`.
+Discord and Reddit fetch exactly those URLs to unfurl — they would try `https` against an HTTP-only port and the
+unfurl silently fails. That is Pillar 3's entire promise breaking in the deployed configuration while every
+automated gate stays green, because the harness sets `ORIGIN` and never sees it.
+
+**What to do:** set `ORIGIN` on the `web` service in `compose.yaml` to the URL a browser actually uses
+(`http://localhost:5173` for the default port map), and `HOST=0.0.0.0` so it is reachable. If you document a
+reverse-proxy deployment, use `PROTOCOL_HEADER=x-forwarded-proto` and `HOST_HEADER=x-forwarded-host` instead and
+say so. **Prove it in your report**: `curl -s http://localhost:5173/b/<slug> | grep -E 'og:(url|image)'` from the
+running container must show `http://` URLs that resolve, not `https://`. A grep showing `https://` is a failed
+acceptance, not a cosmetic detail.
