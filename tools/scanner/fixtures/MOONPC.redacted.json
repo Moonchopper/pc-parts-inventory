@@ -1,0 +1,134 @@
+{
+    "schemaVersion":  1,
+    "scanner":  {
+                    "name":  "scan.ps1",
+                    "version":  "1.0.0",
+                    "os":  "windows"
+                },
+    "host":  {
+                 "hostname":  "MOONPC",
+                 "scannedAt":  "2026-09-05T15:42:55.5347730Z"
+             },
+    "components":  [
+                       {
+                           "category":  "cpu",
+                           "manufacturer":  "AMD",
+                           "model":  "Ryzen 7 9800X3D",
+                           "serial":  null,
+                           "quantity":  1,
+                           "specs":  {
+                                         "cores":  8,
+                                         "threads":  16,
+                                         "maxClockMHz":  4700,
+                                         "socket":  "AM5"
+                                     }
+                       },
+                       {
+                           "category":  "gpu",
+                           "manufacturer":  "AMD",
+                           "model":  "Radeon Graphics",
+                           "serial":  null,
+                           "quantity":  1,
+                           "specs":  {
+                                         "driverVersion":  "32.0.13018.6",
+                                         "vramMB":  2048
+                                     }
+                       },
+                       {
+                           "category":  "gpu",
+                           "manufacturer":  "NVIDIA",
+                           "model":  "GeForce RTX 4070 Ti SUPER",
+                           "serial":  null,
+                           "quantity":  1,
+                           "specs":  {
+                                         "driverVersion":  "32.0.16.1088",
+                                         "vramMB":  16376
+                                     }
+                       },
+                       {
+                           "category":  "memory",
+                           "manufacturer":  "G.SKILL",
+                           "model":  "F5-6000J3036G32G",
+                           "partNumber":  "F5-6000J3036G32G",
+                           "serial":  "c52bfb5b2296",
+                           "quantity":  1,
+                           "slot":  "DIMM 1",
+                           "specs":  {
+                                         "capacityMB":  32768,
+                                         "speedMT":  6000,
+                                         "formFactor":  "DIMM",
+                                         "memoryType":  "DDR5",
+                                         "bankLabel":  "P0 CHANNEL A"
+                                     }
+                       },
+                       {
+                           "category":  "memory",
+                           "manufacturer":  "G.SKILL",
+                           "model":  "F5-6000J3036G32G",
+                           "partNumber":  "F5-6000J3036G32G",
+                           "serial":  "0920ae81070e",
+                           "quantity":  1,
+                           "slot":  "DIMM 1",
+                           "specs":  {
+                                         "capacityMB":  32768,
+                                         "speedMT":  6000,
+                                         "formFactor":  "DIMM",
+                                         "memoryType":  "DDR5",
+                                         "bankLabel":  "P0 CHANNEL B"
+                                     }
+                       },
+                       {
+                           "category":  "storage",
+                           "manufacturer":  "Crucial",
+                           "model":  "CT2000T700SSD5",
+                           "serial":  "74a52495955c",
+                           "quantity":  1,
+                           "specs":  {
+                                         "capacityBytes":  2000398934016,
+                                         "bus":  "NVMe",
+                                         "mediaType":  "SSD",
+                                         "firmware":  "PACR5102"
+                                     }
+                       },
+                       {
+                           "category":  "motherboard",
+                           "manufacturer":  "Gigabyte",
+                           "model":  "B650 EAGLE AX",
+                           "serial":  null,
+                           "quantity":  1,
+                           "specs":  {
+                                         "biosVersion":  "F32g"
+                                     }
+                       },
+                       {
+                           "category":  "monitor",
+                           "manufacturer":  "Acer",
+                           "model":  "ED323QUR A",
+                           "serial":  null,
+                           "quantity":  1,
+                           "specs":  {
+                                         "manufactureYear":  2018
+                                     }
+                       },
+                       {
+                           "category":  "monitor",
+                           "manufacturer":  "Dell",
+                           "model":  "AW3423DWF",
+                           "serial":  "6a91e609a805",
+                           "quantity":  1,
+                           "specs":  {
+                                         "manufactureYear":  2024
+                                     }
+                       },
+                       {
+                           "category":  "monitor",
+                           "manufacturer":  "BenQ",
+                           "model":  "XL2430T",
+                           "serial":  "12a6ea782bf6",
+                           "quantity":  1,
+                           "specs":  {
+                                         "manufactureYear":  2015
+                                     }
+                       }
+                   ]
+}
