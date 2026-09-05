@@ -44,6 +44,9 @@ need it, and you must not ask another agent to run one for you.**
   MISSING  DELETE /builds/{id}/items/{partId}
   present: GET /parts, GET /builds, GET /builds/{id}
   ```
+  **RESOLVED 2026-09-05** — this recon snapshot is historical. All 12 §5 parts/builds entries are in the
+  generated spec since W0.8 merged (`0876d43`), and `GET /parts` now declares `status`, `category`, `buildId`.
+  Kept rather than deleted because it is the evidence for the coverage-check learning in the wave retro.
 - **Plus the `GET /parts` filters.** §5 says `filter status, category, buildId`; `GET /parts` currently declares
   **no query parameters at all** (verified against the spec). `apps/api/src/products/routes.ts` shows the exact
   pattern — `request: { query: z.object({ category: Category.optional() }) }` then `c.req.valid('query')`.

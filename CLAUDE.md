@@ -35,6 +35,8 @@ pnpm harness --name <n>          # boots the API on a temp SQLite DB with HARNES
                                  # READ report.json (counters) and card.png before claiming anything works
 pnpm gen                         # contracts → openapi.json + generated client types (commit the output)
 pnpm dev                         # api :3000 (Scalar docs at /api/docs) + web :5173
+                                 # FOOTGUN: VS Code can squat 127.0.0.1:3000 — Node then binds with NO error
+                                 # and every request hangs. `netstat -ano | findstr :3000` before blaming the API.
 docker compose up --build        # api + web containers, named volume pcpi-data
 powershell -NoProfile -File tools/scanner/scan.ps1 -OutFile scan.json [-ApiUrl http://localhost:3000 -Token …] [-RedactSerials]   # Windows PowerShell 5.1 (pwsh 7 also works if present)
 ```
@@ -65,6 +67,17 @@ artifacts/          gitignored evidence
 - Share responses never include serials, notes, acquired source or owner data.
 - `apps/web` imports only from `packages/contracts` and its generated client — never Drizzle, never `apps/api`.
 - Real hardware is the evidence: the harness fixture is a redacted scan of one of Austin's machines.
+- **Delete responses** return `{ deleted: true }` (the resource itself) or `{ removed: true }` (a link/
+  membership row such as a build item) — never a bare 204, so a client can tell the two apart.
+- **`identityKey` for a manually created part** (no scan behind it) is its `serial` when present, else
+  `part:<id>` — never a `(category, manufacturer, model, slot)` tuple, which is D8's *scan* key and would
+  collide with a later scan of the same hardware.
+- **Valuation totals cover different item sets by design (D5):** `acquiredCents` spans items with a cost
+  basis, `currentCents` spans items with a quote, and the only place `current − acquired` is meaningful is
+  inside `comparable`. Never render a delta computed from the two top-level totals.
+- **Harness checks are files** in `tools/harness/checks/`, discovered by directory read and run in
+  **filename order** — the numeric prefixes are load-bearing. Adding a check means adding a file, never
+  editing `harness.ts`.
 
 ## Framework notes (pinned by the M0 seed; **exact pins, no `^`/`~` anywhere** — verified by the PM 2026-09-05)
 

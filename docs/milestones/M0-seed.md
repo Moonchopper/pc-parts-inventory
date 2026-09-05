@@ -207,7 +207,10 @@ of the imported build, with values from `packages/contracts/fixtures/cost-basis.
 `share.json.valuation.comparable.items >= 2`, `share.json.valuation.comparable.deltaCents != 0` (choose
 `cost-basis.json` values that differ from the fixture quotes so the delta is provably nonzero),
 `share.md` contains **at least two non-dash prices and a totals line**, and
-`share.json.items` is **identical across two runs** (the item-order rule above). **`card.png` must show a total, not
+`share.json.items` is **identical across two runs** (the item-order rule above). The cost-basis step and the artifact assertions are the harness checks **`35-cost-basis`** and
+**`65-valuation-artifacts`**; checks are discovered by reading `tools/harness/checks/` and run in **filename
+order**, so the numeric prefixes are load-bearing — `35-` must sit between the pricing refresh and the share
+fetches, and `65-` must follow `60-share`. **`card.png` must show a total, not
 "Valuation not available yet"** — that image is this milestone's outcome sentence, paid-vs-now, proven end to end.
 
 ## 8. Manual test guide (PM writes `docs/process/test-guides/m0.md`)
