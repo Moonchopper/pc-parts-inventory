@@ -87,6 +87,10 @@ artifacts/          gitignored evidence
 - **pnpm 11 settings live in `pnpm-workspace.yaml`**, not the `pnpm` key of `package.json` (silently ignored).
   `allowBuilds`/`onlyBuiltDependencies` list `better-sqlite3`. That package also ships prebuilds for
   win32/linux/linuxmusl x64+arm64, so no compiler is needed to *run* it — relevant to the container image.
+- **PNG cards: `satori` 0.33.4 + `@resvg/resvg-js` 2.6.2 + `@fontsource/inter` 5.3.0**, in `apps/api` (added by
+  W0.5 — the seed deliberately did not). satori takes a **plain object tree, no JSX**, supports only a small CSS
+  subset (every multi-child element needs an explicit `display: flex`), and accepts **ttf/otf/woff but not woff2**
+  — the two `.woff` faces plus `OFL.txt` are committed under `apps/api/assets/` and loaded once at module scope.
 - **`better-sqlite3` is CJS** (`import Database from 'better-sqlite3'`); `nanoid` and `satori` are ESM-only.
   Everything here is `"type": "module"`.
 - **The harness must never hard-code a port or DB path** — it binds `PORT=0`, reads the port the child reports

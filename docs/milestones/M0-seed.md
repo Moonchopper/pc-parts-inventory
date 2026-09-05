@@ -90,7 +90,7 @@ motherboard `biosVersion, chipset`; monitor `widthPx, heightPx, manufactureYear`
 `Owner`, `Product`, `Part` (+ `product`), `Build` (+ `items: (BuildItem & { part, product })[]`), `ProviderLink`, `PriceQuote`,
 `Import` (+ `summary: { productsCreated, productsUpdated, partsCreated, partsUpdated, partsShelved, buildId }`),
 `Valuation = { buildId, currency, acquiredCents, currentCents, deltaCents, deltaPct, items: { partId, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }[] }`,
-`SharedBuild = { slug, name, description?, updatedAt, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, deltaCents } }`
+`SharedBuild = { slug, name, description?, updatedAt, currency, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, deltaCents } }` (currency added 2026-09-05 — architect)
 (share responses never include serials, notes, acquiredSource or owner data).
 
 **Error shape** (all non-2xx): `{ error: { code: string, message: string, details?: unknown } }`.
