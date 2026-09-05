@@ -61,6 +61,20 @@ A missing or inaccessible CIM class (e.g. `WmiMonitorID` on a headless box, or a
 present on an older OS build) prints a warning and **skips just that category** — the scan still
 completes for everything else.
 
+**Component order in the emitted JSON is deterministic (D19), not CIM enumeration order.**
+CIM/WMI does not guarantee a stable enumeration order across sessions — the same physical
+monitors have been observed to enumerate in a different order across scans of the same machine,
+with no hardware change. `Sort-ScanComponents` (`ScanLib.ps1`) sorts once, immediately before
+emit, so `-OutFile`, the `-ApiUrl` POST body and the `-RedactSerials` fixture always carry the
+same order and the committed fixture is a canonical artifact: category first (the
+`docs/milestones/M0-seed.md` §3 display order — `cpu, cpu_cooler, motherboard, memory, storage,
+gpu, case, psu, case_fan, monitor, os, keyboard, mouse, headset, other`; an unknown/unlisted
+category sorts last), then manufacturer, then model, then `serial` (falling back to `slot`, then
+`''`), all case-insensitive. Windows PowerShell 5.1's `Sort-Object` is not stable, so components
+tied on every key above are given a final tiebreak on their own compact JSON — this only affects
+the relative order of otherwise-identical components, never which values are emitted. This has no
+effect on identity (D8 keys on identity, never on array position).
+
 Cleanup applied to every value (see `ScanLib.ps1` for the exact rules and their tests):
 - Strings are trimmed and internal whitespace runs collapsed (`Clean-String`).
 - Manufacturer names have `(R)`/`(TM)`/`™`/`®` and trailing corporate-form words (`Ltd.`, `LLC`,

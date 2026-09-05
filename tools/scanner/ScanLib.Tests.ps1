@@ -228,3 +228,108 @@ Describe 'Get-SerialHash' {
         (Get-SerialHash '055D00F7') | Should Not Be (Get-SerialHash '4859BDFA')
     }
 }
+
+Describe 'Sort-ScanComponents' {
+    function New-TestComponent {
+        param(
+            [string]$Category,
+            [string]$Manufacturer = 'Acme',
+            [string]$Model = 'Widget',
+            [AllowNull()]$Serial = $null,
+            [AllowNull()]$Slot = $null,
+            [AllowNull()]$Specs = $null
+        )
+        $c = [ordered]@{
+            category     = $Category
+            manufacturer = $Manufacturer
+            model        = $Model
+            serial       = $Serial
+            quantity     = 1
+            specs        = if ($null -ne $Specs) { $Specs } else { [ordered]@{} }
+        }
+        if ($null -ne $Slot) { $c['slot'] = $Slot }
+        return $c
+    }
+
+    It 'returns an empty array for empty input' {
+        (@(Sort-ScanComponents -Components @())).Count | Should Be 0
+    }
+
+    It 'orders components by category in the M0-seed §3 display order, with an unknown category last' {
+        $shuffled = @(
+            (New-TestComponent -Category 'monitor' -Manufacturer 'Dell' -Model 'U2723QE'),
+            (New-TestComponent -Category 'cpu' -Manufacturer 'AMD' -Model 'Ryzen 7 9800X3D'),
+            (New-TestComponent -Category 'flux_capacitor' -Manufacturer 'Doc' -Model 'Time Machine'),
+            (New-TestComponent -Category 'storage' -Manufacturer 'Crucial' -Model 'CT2000T700SSD5'),
+            (New-TestComponent -Category 'gpu' -Manufacturer 'NVIDIA' -Model 'RTX 4070'),
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G'),
+            (New-TestComponent -Category 'motherboard' -Manufacturer 'Gigabyte' -Model 'B650 EAGLE AX')
+        )
+        $sortedCategories = (Sort-ScanComponents -Components $shuffled) | ForEach-Object { $_.category }
+        ($sortedCategories -join ',') | Should Be 'cpu,motherboard,memory,storage,gpu,monitor,flux_capacitor'
+    }
+
+    It 'tiebreaks on manufacturer within the same category' {
+        $tieManufacturer = @(
+            (New-TestComponent -Category 'gpu' -Manufacturer 'NVIDIA' -Model 'RTX 4070'),
+            (New-TestComponent -Category 'gpu' -Manufacturer 'AMD' -Model 'RX 7800 XT')
+        )
+        $sortedManufacturers = (Sort-ScanComponents -Components $tieManufacturer) | ForEach-Object { $_.manufacturer }
+        ($sortedManufacturers -join ',') | Should Be 'AMD,NVIDIA'
+    }
+
+    It 'tiebreaks on model within the same category+manufacturer' {
+        $tieModel = @(
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G'),
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3236F16G')
+        )
+        $sortedModels = (Sort-ScanComponents -Components $tieModel) | ForEach-Object { $_.model }
+        ($sortedModels -join ',') | Should Be 'F5-6000J3036G32G,F5-6000J3236F16G'
+    }
+
+    It 'tiebreaks on serial within the same category+manufacturer+model' {
+        $tieSerial = @(
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Serial 'bbbbbbbbbbbb'),
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Serial 'aaaaaaaaaaaa')
+        )
+        $sortedSerials = (Sort-ScanComponents -Components $tieSerial) | ForEach-Object { $_.serial }
+        ($sortedSerials -join ',') | Should Be 'aaaaaaaaaaaa,bbbbbbbbbbbb'
+    }
+
+    It 'falls back to slot when serial is null' {
+        $tieSlot = @(
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Slot 'DIMM 2'),
+            (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Slot 'DIMM 1')
+        )
+        $sortedSlots = (Sort-ScanComponents -Components $tieSlot) | ForEach-Object { $_.slot }
+        ($sortedSlots -join ',') | Should Be 'DIMM 1,DIMM 2'
+    }
+
+    It 'compares category and manufacturer/model case-insensitively' {
+        $caseInsensitive = @(
+            (New-TestComponent -Category 'GPU' -Manufacturer 'nvidia' -Model 'rtx 4070'),
+            (New-TestComponent -Category 'gpu' -Manufacturer 'AMD' -Model 'RX 7800 XT')
+        )
+        $sortedCI = (Sort-ScanComponents -Components $caseInsensitive) | ForEach-Object { $_.manufacturer }
+        ($sortedCI -join ',') | Should Be 'AMD,nvidia'
+    }
+
+    It 'sorts an unlisted category after every listed category (even "other")' {
+        $unknownLast = @(
+            (New-TestComponent -Category 'totally_unknown' -Manufacturer 'Zzz' -Model 'Zzz'),
+            (New-TestComponent -Category 'other' -Manufacturer 'Aaa' -Model 'Aaa')
+        )
+        $sortedUnknown = (Sort-ScanComponents -Components $unknownLast) | ForEach-Object { $_.category }
+        ($sortedUnknown -join ',') | Should Be 'other,totally_unknown'
+    }
+
+    It 'gives two components tied on category/manufacturer/model/serial a fixed order regardless of input order' {
+        # Sort-Object is not stable in PS 5.1, so this relies on the ConvertTo-Json tiebreak
+        # (the two components differ only in specs.manufactureYear).
+        $dup1 = New-TestComponent -Category 'monitor' -Manufacturer 'Acer' -Model 'ED323QUR A' -Specs ([ordered]@{ manufactureYear = 2018 })
+        $dup2 = New-TestComponent -Category 'monitor' -Manufacturer 'Acer' -Model 'ED323QUR A' -Specs ([ordered]@{ manufactureYear = 2020 })
+        $orderAB = (Sort-ScanComponents -Components @($dup1, $dup2)) | ForEach-Object { $_.specs.manufactureYear }
+        $orderBA = (Sort-ScanComponents -Components @($dup2, $dup1)) | ForEach-Object { $_.specs.manufactureYear }
+        ($orderAB -join ',') | Should Be ($orderBA -join ',')
+    }
+}

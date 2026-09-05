@@ -185,6 +185,90 @@ function Invoke-SelfTest {
     Test-True -Condition ($hashA -ne '055D00F7') -Message 'Get-SerialHash never equals its input'
     Test-True -Condition ($hashA -ne $hashB) -Message 'Get-SerialHash differs for different inputs'
 
+    # 9. Sort-ScanComponents (D19): deterministic emission order.
+    function New-TestComponent {
+        param(
+            [string]$Category,
+            [string]$Manufacturer = 'Acme',
+            [string]$Model = 'Widget',
+            [AllowNull()]$Serial = $null,
+            [AllowNull()]$Slot = $null,
+            [AllowNull()]$Specs = $null
+        )
+        $c = [ordered]@{
+            category     = $Category
+            manufacturer = $Manufacturer
+            model        = $Model
+            serial       = $Serial
+            quantity     = 1
+            specs        = if ($null -ne $Specs) { $Specs } else { [ordered]@{} }
+        }
+        if ($null -ne $Slot) { $c['slot'] = $Slot }
+        return $c
+    }
+
+    Test-Eq (@(Sort-ScanComponents -Components @())).Count 0 'Sort-ScanComponents: empty input returns an empty array'
+
+    $shuffled = @(
+        (New-TestComponent -Category 'monitor' -Manufacturer 'Dell' -Model 'U2723QE'),
+        (New-TestComponent -Category 'cpu' -Manufacturer 'AMD' -Model 'Ryzen 7 9800X3D'),
+        (New-TestComponent -Category 'flux_capacitor' -Manufacturer 'Doc' -Model 'Time Machine'),
+        (New-TestComponent -Category 'storage' -Manufacturer 'Crucial' -Model 'CT2000T700SSD5'),
+        (New-TestComponent -Category 'gpu' -Manufacturer 'NVIDIA' -Model 'RTX 4070'),
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G'),
+        (New-TestComponent -Category 'motherboard' -Manufacturer 'Gigabyte' -Model 'B650 EAGLE AX')
+    )
+    $sortedCategories = (Sort-ScanComponents -Components $shuffled) | ForEach-Object { $_.category }
+    Test-Eq ($sortedCategories -join ',') 'cpu,motherboard,memory,storage,gpu,monitor,flux_capacitor' 'Sort-ScanComponents: category order matches the M0-seed §3 display order, with an unknown category last'
+
+    $tieManufacturer = @(
+        (New-TestComponent -Category 'gpu' -Manufacturer 'NVIDIA' -Model 'RTX 4070'),
+        (New-TestComponent -Category 'gpu' -Manufacturer 'AMD' -Model 'RX 7800 XT')
+    )
+    $sortedManufacturers = (Sort-ScanComponents -Components $tieManufacturer) | ForEach-Object { $_.manufacturer }
+    Test-Eq ($sortedManufacturers -join ',') 'AMD,NVIDIA' 'Sort-ScanComponents: manufacturer tiebreak within the same category'
+
+    $tieModel = @(
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G'),
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3236F16G')
+    )
+    $sortedModels = (Sort-ScanComponents -Components $tieModel) | ForEach-Object { $_.model }
+    Test-Eq ($sortedModels -join ',') 'F5-6000J3036G32G,F5-6000J3236F16G' 'Sort-ScanComponents: model tiebreak within the same category+manufacturer'
+
+    $tieSerial = @(
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Serial 'bbbbbbbbbbbb'),
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Serial 'aaaaaaaaaaaa')
+    )
+    $sortedSerials = (Sort-ScanComponents -Components $tieSerial) | ForEach-Object { $_.serial }
+    Test-Eq ($sortedSerials -join ',') 'aaaaaaaaaaaa,bbbbbbbbbbbb' 'Sort-ScanComponents: serial tiebreak within the same category+manufacturer+model'
+
+    $tieSlot = @(
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Slot 'DIMM 2'),
+        (New-TestComponent -Category 'memory' -Manufacturer 'G.SKILL' -Model 'F5-6000J3036G32G' -Slot 'DIMM 1')
+    )
+    $sortedSlots = (Sort-ScanComponents -Components $tieSlot) | ForEach-Object { $_.slot }
+    Test-Eq ($sortedSlots -join ',') 'DIMM 1,DIMM 2' 'Sort-ScanComponents: falls back to slot when serial is null (memory has no serial burned in)'
+
+    $caseInsensitive = @(
+        (New-TestComponent -Category 'GPU' -Manufacturer 'nvidia' -Model 'rtx 4070'),
+        (New-TestComponent -Category 'gpu' -Manufacturer 'AMD' -Model 'RX 7800 XT')
+    )
+    $sortedCI = (Sort-ScanComponents -Components $caseInsensitive) | ForEach-Object { $_.manufacturer }
+    Test-Eq ($sortedCI -join ',') 'AMD,nvidia' 'Sort-ScanComponents: category and manufacturer/model comparisons are case-insensitive'
+
+    $unknownLast = @(
+        (New-TestComponent -Category 'totally_unknown' -Manufacturer 'Zzz' -Model 'Zzz'),
+        (New-TestComponent -Category 'other' -Manufacturer 'Aaa' -Model 'Aaa')
+    )
+    $sortedUnknown = (Sort-ScanComponents -Components $unknownLast) | ForEach-Object { $_.category }
+    Test-Eq ($sortedUnknown -join ',') 'other,totally_unknown' 'Sort-ScanComponents: an unlisted category sorts after every listed category (even "other")'
+
+    $dup1 = New-TestComponent -Category 'monitor' -Manufacturer 'Acer' -Model 'ED323QUR A' -Specs ([ordered]@{ manufactureYear = 2018 })
+    $dup2 = New-TestComponent -Category 'monitor' -Manufacturer 'Acer' -Model 'ED323QUR A' -Specs ([ordered]@{ manufactureYear = 2020 })
+    $orderAB = (Sort-ScanComponents -Components @($dup1, $dup2)) | ForEach-Object { $_.specs.manufactureYear }
+    $orderBA = (Sort-ScanComponents -Components @($dup2, $dup1)) | ForEach-Object { $_.specs.manufactureYear }
+    Test-Eq ($orderAB -join ',') ($orderBA -join ',') 'Sort-ScanComponents: two components tied on category/manufacturer/model/serial still come out in the same fixed order regardless of input order (JSON tiebreak, since Sort-Object is not stable in PS 5.1)'
+
     Write-Host ''
     Write-Host "Self-test: $script:assertTotal assertions, $script:assertFailed failed."
     if ($script:assertFailed -gt 0) { return 1 }
@@ -523,6 +607,13 @@ $components += @(Get-MonitorComponentList)
 if ($RedactSerials) {
     Protect-ScanSerials -Components $components
 }
+
+# D19: sort once, just before emit, so -OutFile, the -ApiUrl POST body and the -RedactSerials
+# fixture all carry the same deterministic order (see Sort-ScanComponents in ScanLib.ps1).
+# @(...) wraps the call: a function that emits exactly one object to the pipeline would
+# otherwise unwrap to a bare hashtable (not a 1-element array) on assignment, and zero objects
+# would unwrap to $null - @(...) forces array semantics regardless of how many components sort.
+$components = @(Sort-ScanComponents -Components $components)
 
 $payload = [ordered]@{
     schemaVersion = 1

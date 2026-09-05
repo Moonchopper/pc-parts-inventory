@@ -457,3 +457,80 @@ function Get-SerialHash {
         $sha256.Dispose()
     }
 }
+
+# Category display order (D19), verbatim from the M0-seed.md §3 category enum (PCPartPicker's
+# vocabulary). Sort-ScanComponents uses this so the emitted component order is deterministic and
+# the committed fixture is a canonical artifact. An unknown/unlisted category sorts after every
+# listed one here (see Get-CategorySortRank) rather than crashing or sorting first.
+$script:CategoryDisplayOrder = @(
+    'cpu', 'cpu_cooler', 'motherboard', 'memory', 'storage', 'gpu', 'case', 'psu', 'case_fan',
+    'monitor', 'os', 'keyboard', 'mouse', 'headset', 'other'
+)
+
+function Get-CategorySortRank {
+    <#
+        .SYNOPSIS
+        Maps a component `category` string to its position in $script:CategoryDisplayOrder,
+        case-insensitively. An unknown, unlisted, or $null/empty category sorts after every
+        listed category (returns the list's length) rather than crashing or sorting first.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$Category
+    )
+    if ([string]::IsNullOrEmpty($Category)) { return $script:CategoryDisplayOrder.Count }
+    $normalized = $Category.ToLowerInvariant()
+    for ($i = 0; $i -lt $script:CategoryDisplayOrder.Count; $i++) {
+        if ($script:CategoryDisplayOrder[$i] -eq $normalized) { return $i }
+    }
+    return $script:CategoryDisplayOrder.Count
+}
+
+function Sort-ScanComponents {
+    <#
+        .SYNOPSIS
+        Returns `Components` in a deterministic order (D19): category in the M0-seed.md §3
+        display order (unknown/unlisted categories last), then manufacturer, then model, then
+        (serial ?? slot ?? ''), all case-insensitive.
+
+        Windows PowerShell 5.1's Sort-Object is not guaranteed stable, so two components that
+        are tied on every key above would otherwise come out in an unpredictable relative order
+        on different runs. A final tiebreak on each component's own compact JSON
+        (ConvertTo-Json -Compress -Depth 10) gives every distinguishable component a fully
+        determined sort key, so an identical *multiset* of components (regardless of the input
+        array's order) always sorts to byte-identical output. Never mutates the input array;
+        returns a new array (empty in, empty out). Called once, just before emit, so -OutFile,
+        the -ApiUrl POST body and the -RedactSerials fixture all carry the same order.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [array]$Components
+    )
+    if ($null -eq $Components -or $Components.Count -eq 0) { return @() }
+
+    # Indexer syntax ($component['key']), not dot notation: ScanLib.ps1 runs under
+    # Set-StrictMode -Version 2.0, which throws PropertyNotFoundStrict for a dot-accessed key
+    # that a given category's hashtable never sets (e.g. 'slot' on anything but memory) — the
+    # indexer returns $null for a missing key instead, strict mode or not.
+    $decorated = $Components | ForEach-Object {
+        $component = $_
+        $serialish = $component['serial']
+        if ([string]::IsNullOrEmpty($serialish)) { $serialish = $component['slot'] }
+        if ([string]::IsNullOrEmpty($serialish)) { $serialish = '' }
+
+        [PSCustomObject]@{
+            Rank         = Get-CategorySortRank ([string]$component['category'])
+            Manufacturer = ([string]$component['manufacturer']).ToLowerInvariant()
+            Model        = ([string]$component['model']).ToLowerInvariant()
+            SerialIsh    = ([string]$serialish).ToLowerInvariant()
+            Tiebreak     = ($component | ConvertTo-Json -Compress -Depth 10)
+            Component    = $component
+        }
+    }
+
+    $sorted = $decorated | Sort-Object -Property Rank, Manufacturer, Model, SerialIsh, Tiebreak
+    return @($sorted | ForEach-Object { $_.Component })
+}
