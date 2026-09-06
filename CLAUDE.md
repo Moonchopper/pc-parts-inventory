@@ -14,8 +14,8 @@ Read in this order when starting a task: this file → the brief you were given 
   Roles: **Fable = architect/lead (the session)**, **Opus = PM/PO** (`pm` agent: briefs + validation + in-wave
   integration), **Sonnet = implementer**. Agents: `~/.claude/agents/{pm,implementer,architect,debugger,qa}.md`.
 - Decisions: [`docs/adr/`](docs/adr/) — **0001 stack + API-first** (accepted)
-- Milestones / wave plans: [`docs/milestones/`](docs/milestones/) — **M0 Seed** (current — `M0-seed.md`: settled
-  decisions D1–D15, data model, contracts, API surface, work items W0.1–W0.6), M1 Capture + delta, M2 Share
+- Milestones / wave plans: [`docs/milestones/`](docs/milestones/) — M0 Seed ✅ (`M0-seed.md` D1–D15 + `M0-fixup.md`
+  D16–D19; PR #1) · **M1 Capture + delta — next: `M1-capture.md` is the stub; the architect writes the wave plan from it** · M2 Share
 - Briefs: [`docs/process/briefs/`](docs/process/briefs/) · Test guides: [`docs/process/test-guides/`](docs/process/test-guides/) ·
   Retro log: [`docs/process/retro-log.md`](docs/process/retro-log.md)
 
