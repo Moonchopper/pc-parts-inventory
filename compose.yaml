@@ -1,0 +1,78 @@
+# M0 W0.6 (D13) — two containers behind one compose file, SQLite on a named volume (never a bind
+# mount: WSL2 locks/slows a SQLite file on one — ADR-0001 R12), a `postgres` stub for M2 that a
+# plain `docker compose up` must never start.
+#
+# `docker compose up --build` needs no `.env` file: every variable below has a working default
+# baked into the images (docker/Dockerfile.api, docker/Dockerfile.web) or set explicitly here.
+# `API_TOKEN` is intentionally unset — D3 says the API is open when it's absent, which is correct
+# for local compose (see docker/README.md).
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      DATABASE_URL: file:/data/pcpi.db
+      PORT: "3000"
+      # F10/D16: the API's own request origin inside this container is the Docker-internal
+      # `http://api:3000` — never a URL a person should see. PUBLIC_ORIGIN is the web service's
+      # public origin (same value as the `web` service's own ORIGIN below), the one source the
+      # Markdown share footer (and any future webhook/email) uses instead.
+      PUBLIC_ORIGIN: http://localhost:5173
+    volumes:
+      - pcpi-data:/data
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    environment:
+      API_URL: http://api:3000
+      PORT: "3001"
+      HOST: "0.0.0.0"
+      # PM addendum 2 (2026-09-05): @sveltejs/adapter-node defaults the request-origin *scheme* to
+      # https when neither ORIGIN nor a trusted PROTOCOL_HEADER is set (adapter's handler.js,
+      # get_origin). The share page builds og:url/og:image from that origin — left unset, both tags
+      # would claim https:// on this plain-HTTP container, and Discord/Reddit fetch exactly those
+      # URLs to unfurl, so the unfurl would silently fail. ORIGIN must be the URL a browser actually
+      # uses for this compose file's port map (host 5173 -> web); deploying behind a reverse proxy
+      # instead should set PROTOCOL_HEADER=x-forwarded-proto and HOST_HEADER=x-forwarded-host here
+      # in its place, per apps/web/src/lib/og.ts's PUBLIC_ORIGIN override.
+      ORIGIN: http://localhost:5173
+    ports:
+      - "5173:3001"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # M2 target (D13) — the service and its env only; not exercised in M0. `profiles: [postgres]`
+  # keeps it out of a plain `docker compose up`; bring it up explicitly with
+  # `docker compose --profile postgres up`.
+  postgres:
+    image: postgres:17.5
+    profiles: [postgres]
+    environment:
+      POSTGRES_DB: pcpi
+      POSTGRES_USER: pcpi
+      POSTGRES_PASSWORD: pcpi
+    volumes:
+      - pcpi-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  pcpi-data:
+  pcpi-postgres-data:

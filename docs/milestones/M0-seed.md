@@ -16,9 +16,9 @@ with counters in `artifacts/harness/m0/report.json`, and `docker compose up` run
 |---|---|---|
 | D1 | **TypeScript everywhere.** Node 22 LTS (installed: 22.14.0; 24 is a later drop-in), pnpm via corepack (`corepack enable pnpm`), pnpm workspace, TS strict. API = Hono + `@hono/zod-openapi`; DB = Drizzle (better-sqlite3 now; `drizzle-orm/postgres-js` later); web = SvelteKit 2 / Svelte 5 (adapter-node); tests = vitest; lint/format = Biome; PNG = satori + `@resvg/resvg-js`. **Exact version pins**, recorded in `CLAUDE.md` § Framework notes by the seed brief. | ADR-0001 |
 | D2 | **The API is the product.** `apps/web` never imports Drizzle or touches the DB; it calls `apps/api` through the client generated from `/api/openapi.json`. Every UI feature is first an endpoint. | ADR-0001 |
-| D3 | **`ownerId` on every root table** (`products`, `parts`, `builds`, `imports`, `jobs`). v1 has one owner, seeded at first run with id `local`. No auth UI; an `API_TOKEN` env var — when set, mutating routes require `Authorization: Bearer`; when unset (dev/harness), open. Share routes are always public. | Pillar 4, R13 |
+| D3 | **`ownerId` on every root table** (`products`, `parts`, `builds`, `imports`, `jobs`). v1 has one owner, seeded at first run with id `local`. No auth UI; an `API_TOKEN` env var — when set, mutating routes require `Authorization: Bearer`; when unset (dev/harness), open. Share routes are always public. (§3 `jobs` corrected 2026-09-05 — architect.) | Pillar 4, R13 |
 | D4 | **Product / Part split.** `Product` = catalog identity (what it is); `Part` = a physical unit you own (serial, condition, cost basis, status). Quotes attach to products so two identical GPUs cost one fetch. Products are owner-scoped in v1; a global catalog is a later ADR. | Pillar 2 |
-| D5 | **Price quotes are append-only** (`price_quotes`). "Current value" is a query: latest quote per product with kind precedence `used_market > new_retail > msrp`; the response says which kind and how old. | Pillar 2 |
+| D5 | **Price quotes are append-only** (`price_quotes`). "Current value" is a query: latest quote per product with kind precedence `used_market > new_retail > msrp`; the response says which kind and how old. **No fallback: an item with no quote has no current value and is excluded from the comparable set.** (no fallback; comparable set — 2026-09-05 architect) | Pillar 2 |
 | D6 | **Money = integer minor units + ISO-4217 currency** (`priceCents`, `currency` default `USD`). No floats. | — |
 | D7 | **Builds are shareable by slug.** `slug` = 10-char lowercase base32 nanoid, user-overridable, globally unique. `visibility`: `private \| unlisted \| public`, default **`unlisted`** (URL works; not listed). Web route `/b/{slug}`; API `GET /share/{slug}` (+ `.md`, `/card.png`). | Pillar 3 |
 | D8 | **Scan import is idempotent.** Identity key per component: `serial` if present, else `(category, manufacturer, model, slot)`. Re-scanning a host updates in place; components missing from a later scan are marked `status = on_shelf` (never deleted). One build per `hostname` is auto-created (`name = hostname`, `source = 'scan'`) and scanned parts are placed in it. | Pillar 1 |
@@ -67,7 +67,7 @@ price_quotes  { id, productId, providerLinkId?, provider: text, kind: enum('new_
                 priceCents: int, currency: text, observedAt: timestamp, sourceUrl: text?, raw: json? }   // append-only
 imports       { id, ownerId, kind: enum('scan','order_csv','manual'), source: text, payloadHash: text unique, payload: json,
                 status: enum('received','processed','failed'), summary: json?, receivedAt, processedAt? }
-jobs          { id, kind: text, runAt: timestamp, status: enum('queued','running','done','failed'), attempts: int, payload: json, lastError: text? }
+jobs          { id, ownerId → owners, kind: text, runAt: timestamp, status: enum('queued','running','done','failed'), attempts: int, payload: json, lastError: text? }
 ```
 
 `category` enum (matches PCPartPicker's vocabulary): `cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu,
@@ -89,8 +89,28 @@ motherboard `biosVersion, chipset`; monitor `widthPx, heightPx, manufactureYear`
 **API DTOs** (response shapes; request shapes are the same minus server fields):
 `Owner`, `Product`, `Part` (+ `product`), `Build` (+ `items: (BuildItem & { part, product })[]`), `ProviderLink`, `PriceQuote`,
 `Import` (+ `summary: { productsCreated, productsUpdated, partsCreated, partsUpdated, partsShelved, buildId }`),
-`Valuation = { buildId, currency, acquiredCents, currentCents, deltaCents, deltaPct, items: { partId, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }[] }`,
-`SharedBuild = { slug, name, description?, updatedAt, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, deltaCents } }`
+```ts
+Valuation = {                        // (revised 2026-09-05 — architect: no fallback; explicit comparable set)
+  buildId, currency,
+  acquiredCents ★,   // Σ acquired over items with a known cost basis — "what I paid"
+  currentCents ★,    // Σ current over items with a quote — "what the priced parts are worth now"
+  comparable ★: { items, acquiredCents, currentCents, deltaCents, deltaPct | null },
+                     // like-for-like over items having BOTH; deltaCents == currentCents − acquiredCents
+                     // holds HERE and only here; deltaPct is null when comparable.acquiredCents == 0
+  coverage ★:   { items, withAcquired, withCurrent },
+  items: [{ partId, quantity, acquiredCents?, currentCents?, quote?: { kind, provider, observedAt, ageDays } }]
+}
+```
+There is **no top-level `deltaCents`/`deltaPct`** — a delta over mismatched item sets is not a delta, so it lives
+only inside `comparable`. **Per-item:** `parts.acquiredPriceCents` is the **total** paid for that part row (all of
+its `quantity`); an item's `currentCents` is the chosen quote's `priceCents × quantity`. A row with a quote but no
+cost basis contributes to `currentCents` and `coverage.withCurrent` but **not** to `comparable`. **No fallback in
+either direction, ever.** The ★ fields are the subset carried by `SharedBuild.valuation`.
+`SharedBuild = { slug, name, description?, updatedAt, currency, items: { category, manufacturer, model, quantity, currentCents? }[], valuation?: { acquiredCents, currentCents, comparable, coverage } }` (currency added 2026-09-05 — architect)
+**Share item order** (and `GET /builds/{id}` items) is deterministic: category in the display order of the §3 enum
+(`cpu, cpu_cooler, motherboard, memory, storage, gpu, case, psu, case_fan, monitor, os, keyboard, mouse, headset,
+other`), then manufacturer, then model, then quantity descending. Sorted **once, in the API**, so JSON, page, MD
+and PNG always agree. (item order added 2026-09-05 — architect)
 (share responses never include serials, notes, acquiredSource or owner data).
 
 **Error shape** (all non-2xx): `{ error: { code: string, message: string, details?: unknown } }`.
@@ -169,10 +189,29 @@ Goal: `tools/scanner/scan.ps1` emits a valid ScanPayload for a Windows machine.
 
 ## 7. Integration gate (PM runs after W0.6 on `feat/m0-seed`)
 
-`pnpm harness --name m0` with the **real redacted scan** (D15) → `artifacts/harness/m0/report.json` must show:
-`importsIdempotent: true`, `productsCreated ≥ 5`, `partsCreated ≥ 6`, `buildsCreated: 1`, `quotesRecorded ≥ 2`,
-`valuation.currentCents > 0`, `share.html.ogTags: 4`, `share.md.rows == items`, `card.png.bytes > 10000`. The PM reads
-`card.png` and `share.html` and quotes what it saw. Then `docker compose up --build` + `curl` the share page.
+`pnpm harness --name m0 --fixture tools/scanner/fixtures/<hostname>.redacted.json` with the **real redacted scan**
+(D15) → `artifacts/harness/m0/report.json` must show: `importsIdempotent: true`, `productsCreated ≥ 5`,
+`partsCreated ≥ 6`, `buildsCreated: 1`, `quotesRecorded ≥ 2`, `share.html.ogTags: 4`, `share.md.rows == items`,
+`card.png.bytes > 10000`. The PM reads `card.png` and `share.html` and quotes what it saw. Then
+`docker compose up --build` + `curl` the share page **and its `og:image` through the web origin** —
+`curl -o card.png -w '%{http_code} %{content_type}' http://localhost:5173/api/v1/share/<slug>/card.png`
+must return **200 image/png**, because that is the URL Discord fetches to unfurl. (og:image proxy curl added
+2026-09-05 — architect.)
+
+**The gate reads money from the artifacts, never from the endpoint** (revised 2026-09-05 — architect; the original
+asserted `valuation.currentCents > 0` against `GET /builds/{id}/valuation` and so passed while every user-visible
+artifact rendered em-dashes). Before the share fetches, the harness `PATCH`es `acquiredPriceCents` onto **≥ 2 parts**
+of the imported build, with values from `packages/contracts/fixtures/cost-basis.json` keyed by `identityKey`
+(fewer than 2 matches fails the check). It then asserts, from the share payload and exports:
+`share.json.valuation.acquiredCents > 0`, `share.json.valuation.currentCents > 0`,
+`share.json.valuation.comparable.items >= 2`, `share.json.valuation.comparable.deltaCents != 0` (choose
+`cost-basis.json` values that differ from the fixture quotes so the delta is provably nonzero),
+`share.md` contains **at least two non-dash prices and a totals line**, and
+`share.json.items` is **identical across two runs** (the item-order rule above). The cost-basis step and the artifact assertions are the harness checks **`35-cost-basis`** and
+**`65-valuation-artifacts`**; checks are discovered by reading `tools/harness/checks/` and run in **filename
+order**, so the numeric prefixes are load-bearing — `35-` must sit between the pricing refresh and the share
+fetches, and `65-` must follow `60-share`. **`card.png` must show a total, not
+"Valuation not available yet"** — that image is this milestone's outcome sentence, paid-vs-now, proven end to end.
 
 ## 8. Manual test guide (PM writes `docs/process/test-guides/m0.md`)
 

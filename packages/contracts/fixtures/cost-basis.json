@@ -1,0 +1,11 @@
+{
+  "cpu|AMD|Ryzen 9 7900X|": 40000,
+  "GPU-SN-0001": 60000,
+  "STORAGE-SN-0001": 12000,
+  "motherboard|ASUS|ROG STRIX B650E-F GAMING WIFI|": 30000,
+
+  "cpu|AMD|Ryzen 7 9800X3D|": 55000,
+  "gpu|NVIDIA|GeForce RTX 4070 Ti SUPER|": 90000,
+  "c52bfb5b2296": 15000,
+  "f212d6bf264f": 20000
+}

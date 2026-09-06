@@ -1,0 +1,30 @@
+{
+  "name": "@pcpi/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "gen": "tsx scripts/gen.ts",
+    "validate": "tsx scripts/validate.ts"
+  },
+  "dependencies": {
+    "hono": "4.13.7",
+    "@hono/zod-openapi": "1.6.3",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@pcpi/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "dev": "cross-env NODE_ENV=development tsx watch src/serve.ts",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@pcpi/contracts": "workspace:*",
+    "@pcpi/core": "workspace:*",
+    "@fontsource/inter": "5.3.0",
+    "@hono/node-server": "2.1.1",
+    "@hono/zod-openapi": "1.6.3",
+    "@resvg/resvg-js": "2.6.2",
+    "@scalar/hono-api-reference": "0.12.0",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.7",
+    "nanoid": "6.0.1",
+    "satori": "0.33.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "cross-env": "10.1.0",
+    "drizzle-kit": "0.31.10"
+  }
+}

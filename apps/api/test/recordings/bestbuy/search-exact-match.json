@@ -1,0 +1,22 @@
+{
+  "from": 1,
+  "to": 1,
+  "currentPage": 1,
+  "total": 1,
+  "totalPages": 1,
+  "queryTime": "0.012",
+  "totalTime": "0.041",
+  "partial": false,
+  "products": [
+    {
+      "sku": 6602010,
+      "name": "AMD - Ryzen 7 9800X3D 8-Core, 16-Thread, 4.7 GHz (5.2 GHz Max Boost) Socket AM5 Unlocked Desktop Processor - Black",
+      "salePrice": 479.99,
+      "regularPrice": 479.99,
+      "manufacturer": "AMD",
+      "modelNumber": "100-100001514WOF",
+      "upc": "730143314968",
+      "url": "https://www.bestbuy.com/site/amd-ryzen-7-9800x3d/6602010.p"
+    }
+  ]
+}

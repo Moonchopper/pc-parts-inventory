@@ -1,0 +1,109 @@
+# syntax=docker/dockerfile:1.7
+#
+# apps/api — Hono + zod-openapi, Drizzle/better-sqlite3, satori+resvg PNG cards.
+# Built from the repo root: `docker build -f docker/Dockerfile.api .` (compose.yaml does this).
+#
+# Two stages: a `node:22.14.0-slim` builder (pnpm install -> build -> pruned prod install) and a
+# `node:22.14.0-slim` runtime that never sees a compiler. node:22-slim (Debian, glibc) rather than
+# distroless: distroless ships no shell/curl/wget, so the HEALTHCHECK below would need the same
+# `node -e` probe anyway, and Debian's glibc is a direct match for one of better-sqlite3's and
+# @resvg/resvg-js's prebuilt targets (no musl translation to reason about).
+
+# ---------------------------------------------------------------------------------------------
+# Builder
+# ---------------------------------------------------------------------------------------------
+FROM node:22.14.0-slim AS builder
+
+# --- Native-module finding (M0 PM addendum 1, 2026-09-05) --------------------------------------
+# pnpm-workspace.yaml's `onlyBuiltDependencies`/`allowBuilds` allow-list better-sqlite3's install
+# step. better-sqlite3@13.0.3 ships prebuilt `.node` binaries for linux-x64/linuxmusl-x64 (verified
+# by the PM — confirmed again in this repo's own node_modules/.pnpm/better-sqlite3@13.0.3/.../
+# prebuilds/), but the package also ships a `binding.gyp` with no explicit install/postinstall
+# script, so pnpm's approved-build step falls back to an implicit `node-gyp rebuild` instead of
+# reusing the shipped prebuild — the PM saw this spawn MSBuild on Windows.
+#
+# Two ways to handle that in this image (per the addendum): (a) keep pnpm-workspace.yaml exactly
+# as it is and give only this builder stage a C/C++ toolchain so the opt-in build succeeds no
+# matter which path node-gyp takes, or (b) skip the build script and rely on the shipped prebuild,
+# which would need pnpm-workspace.yaml edited (outside this brief's Scope, and it would change
+# install behaviour for every workspace, not just this image). We take (a): zero edits outside
+# Scope, and the toolchain never reaches the runtime stage below.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    CI=true \
+    PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH
+RUN corepack enable
+
+WORKDIR /app
+
+# --- Manifests first: installs stay cached across source-only changes --------------------------
+# Deliberately NOT copying the root tsconfig.json (the project-reference aggregator that lists
+# apps/web and tools/harness): Vite's tsconfig resolution walks up from a package looking for the
+# nearest tsconfig.json and errors on references it can't find on disk, and tsc itself never needs
+# it here — every package's own tsconfig extends only tsconfig.base.json. Verified against this
+# exact partial-tree shape before writing this file (see the brief's report for the repro).
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc tsconfig.base.json ./
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/core/package.json packages/core/package.json
+COPY apps/api/package.json apps/api/package.json
+
+# `@pcpi/api...` = the target plus everything it depends on (contracts, core) — never apps/web or
+# tools/*, so this install never needs to resolve them; pnpm just reports "Scope: 3 of 4 workspace
+# projects" against the full lockfile and proceeds (`--frozen-lockfile` still holds).
+RUN --mount=type=cache,id=pcpi-pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --filter @pcpi/api... --frozen-lockfile
+
+# --- Real source, then build just what the API needs -------------------------------------------
+COPY packages/contracts packages/contracts
+COPY packages/core packages/core
+COPY apps/api apps/api
+
+RUN pnpm --filter @pcpi/api... build
+
+# --- Pruned production install ------------------------------------------------------------------
+# Drops typescript/drizzle-kit/@types/* etc. now that dist/ exists. `CI=true` (set above) is what
+# lets this rerun non-interactively — pnpm otherwise refuses to touch an existing node_modules
+# without a TTY (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY).
+RUN --mount=type=cache,id=pcpi-pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --filter @pcpi/api... --frozen-lockfile --prod
+
+# ---------------------------------------------------------------------------------------------
+# Runtime — no compiler, no pnpm, no devDependencies.
+# ---------------------------------------------------------------------------------------------
+FROM node:22.14.0-slim AS runtime
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    DATABASE_URL=file:/data/pcpi.db
+
+WORKDIR /app
+
+# Non-root; /data is the named-volume mount point (D13) and must be writable by the process that
+# creates apps/api/src/db/client.ts's sqlite file on first boot.
+RUN groupadd --system pcpi \
+    && useradd --system --gid pcpi --home-dir /app --shell /usr/sbin/nologin pcpi \
+    && mkdir -p /data \
+    && chown -R pcpi:pcpi /data /app
+
+# pnpm's isolated linker gives every workspace package its own node_modules of relative symlinks
+# into the root node_modules/.pnpm store (e.g. apps/api/node_modules/better-sqlite3 -> ../../../
+# node_modules/.pnpm/better-sqlite3@13.0.3/...) — copying the whole builder /app in one shot keeps
+# every symlink's relative target valid, which cherry-picking individual subpaths would not.
+COPY --from=builder --chown=pcpi:pcpi /app /app
+
+USER pcpi
+EXPOSE 3000
+VOLUME ["/data"]
+
+# Node 22 has global fetch, so a one-line inline probe covers /health without needing curl/wget in
+# the slim image. Hits the real mounted path (apps/api/src/app.ts: `app.route('/api/v1', v1)`).
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "apps/api/dist/serve.js"]

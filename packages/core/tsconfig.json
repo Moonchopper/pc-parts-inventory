@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  // W0.1's tests live in ../test (a sibling of src/, so already outside "include" above) — W0.3's
+  // Scope co-locates the pricing package's tests inside src/pricing/ instead (`*.test.ts` next to
+  // the module it covers). Without this exclude, `tsc -b` would compile them into dist/ too, and
+  // vitest's default include glob would then run each one twice (once from src, once from the
+  // compiled dist/*.test.js it has no other reason to exist).
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../contracts" }]
+}

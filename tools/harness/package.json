@@ -1,0 +1,14 @@
+{
+  "name": "@pcpi/harness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@pcpi/contracts": "workspace:*",
+    "@pcpi/core": "workspace:*"
+  }
+}

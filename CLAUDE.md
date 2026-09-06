@@ -14,14 +14,17 @@ Read in this order when starting a task: this file → the brief you were given 
   Roles: **Fable = architect/lead (the session)**, **Opus = PM/PO** (`pm` agent: briefs + validation + in-wave
   integration), **Sonnet = implementer**. Agents: `~/.claude/agents/{pm,implementer,architect,debugger,qa}.md`.
 - Decisions: [`docs/adr/`](docs/adr/) — **0001 stack + API-first** (accepted)
-- Milestones / wave plans: [`docs/milestones/`](docs/milestones/) — **M0 Seed** (current — `M0-seed.md`: settled
-  decisions D1–D15, data model, contracts, API surface, work items W0.1–W0.6), M1 Capture + delta, M2 Share
+- Milestones / wave plans: [`docs/milestones/`](docs/milestones/) — M0 Seed ✅ (`M0-seed.md` D1–D15 + `M0-fixup.md`
+  D16–D19; PR #1) · **M1 Capture + delta — next: `M1-capture.md` is the stub; the architect writes the wave plan from it** · M2 Share
 - Briefs: [`docs/process/briefs/`](docs/process/briefs/) · Test guides: [`docs/process/test-guides/`](docs/process/test-guides/) ·
   Retro log: [`docs/process/retro-log.md`](docs/process/retro-log.md)
 
 ## Commands (run from the repo/worktree root — the M0 seed creates them; keep this block true)
 
 ```bash
+# pnpm bootstrap on Austin's box: `corepack enable pnpm` FAILS (EPERM — D:\nodejs is not user-writable).
+# Use a writable dir on the PERSISTENT user PATH (PowerShell + Git Bash):  corepack enable --install-directory C:\Users\austi\.local\bin pnpm
+# CI runners are fine with plain `corepack enable` / pnpm/action-setup.
 pnpm install --frozen-lockfile
 pnpm build                       # all workspaces
 pnpm typecheck                   # tsc -b + svelte-check
@@ -31,7 +34,17 @@ pnpm harness --name <n>          # boots the API on a temp SQLite DB with HARNES
                                  # runs due jobs, fetches share JSON/HTML/MD/PNG → artifacts/harness/<n>/{report.json,card.png,share.html}
                                  # READ report.json (counters) and card.png before claiming anything works
 pnpm gen                         # contracts → openapi.json + generated client types (commit the output)
-pnpm dev                         # api :3000 (Scalar docs at /api/docs) + web :5173
+pnpm dev                         # api :3000 (Scalar docs at /api/docs) + web :5173. Runs the API with
+                                 # NODE_ENV=development, so POST /jobs/run-due exists (D10) — but you rarely need it:
+                                 # enqueue wakes the runner (D18), so a refresh lands in ~1 s, not 30.
+# PREFERRED dev invocation on Austin's box (PowerShell 5.1) — dodges the :3000 squatters entirely:
+#   $env:PORT='3010'; $env:API_URL='http://localhost:3010'; $env:PUBLIC_ORIGIN='http://localhost:5173'; pnpm dev
+#   web stays on :5173 (vite ignores PORT). PUBLIC_ORIGIN has no sensible dev default: without it the Markdown
+#   footer links the API's own port, which serves no /b/ page (compose sets it; `pnpm dev` cannot guess it).
+                                 # FOOTGUN (now caught, not silent): VS Code can squat 127.0.0.1:3000 while Node binds
+                                 # 0.0.0.0:3000 with NO error — the more specific binding wins and every request goes
+                                 # to the squatter. The API now health-checks its own port right after it binds and
+                                 # exits 1 with a loud line naming it. `netstat -ano | findstr :3010` to find the owner.
 docker compose up --build        # api + web containers, named volume pcpi-data
 powershell -NoProfile -File tools/scanner/scan.ps1 -OutFile scan.json [-ApiUrl http://localhost:3000 -Token …] [-RedactSerials]   # Windows PowerShell 5.1 (pwsh 7 also works if present)
 ```
@@ -62,10 +75,56 @@ artifacts/          gitignored evidence
 - Share responses never include serials, notes, acquired source or owner data.
 - `apps/web` imports only from `packages/contracts` and its generated client — never Drizzle, never `apps/api`.
 - Real hardware is the evidence: the harness fixture is a redacted scan of one of Austin's machines.
+- **Delete responses** return `{ deleted: true }` (the resource itself) or `{ removed: true }` (a link/
+  membership row such as a build item) — never a bare 204, so a client can tell the two apart.
+- **`identityKey` for a manually created part** (no scan behind it) is its `serial` when present, else
+  `part:<id>` — never a `(category, manufacturer, model, slot)` tuple, which is D8's *scan* key and would
+  collide with a later scan of the same hardware.
+- **Valuation totals cover different item sets by design (D5):** `acquiredCents` spans items with a cost
+  basis, `currentCents` spans items with a quote, and the only place `current − acquired` is meaningful is
+  inside `comparable`. Never render a delta computed from the two top-level totals.
+- **Harness checks are files** in `tools/harness/checks/`, discovered by directory read and run in
+  **filename order** — the numeric prefixes are load-bearing. Adding a check means adding a file, never
+  editing `harness.ts`.
+- **A URL that leaves the system never comes from the API's own request origin (D16).** `PUBLIC_ORIGIN` is the
+  one source for the Markdown footer and anything like it, and a user-facing link points at the human page
+  `/b/{slug}` — never `/api/v1/…`, never an internal hostname like `api:3000`.
+- **"No data" never renders as a number (D17).** `—` when the coverage count is 0 or the value is absent, in
+  every renderer (card, Markdown, share page, build page, inventory). `$0.00` means a real zero was recorded.
+- **The scanner cleans trailing punctuation off serials** before they become a D8 identity key (an NVMe that
+  reports `…E87F_6C0C.` is the same disk as `…E87F_6C0C`), and **emits `components` in a deterministic order**
+  (D19: category §3-order, manufacturer, model, `serial ?? slot ?? ''`) — WMI enumeration order is not stable, so
+  without the sort the committed fixture moves on every capture. Two captures differ only in `scannedAt`.
+- **Every agent stops every server it starts** and pastes a `netstat -ano | findstr LISTENING` tail proving it
+  (playbook learning 35). On this box `Stop-Process` is blocked by the permission classifier; `taskkill //PID <n>
+  //T //F` works from the Bash tool.
 
-## Framework notes (the seed brief fills these in with the pinned versions and the gotchas that matter to LLM-written code)
+## Framework notes (pinned by the M0 seed; **exact pins, no `^`/`~` anywhere** — verified by the PM 2026-09-05)
 
-- Svelte 5 runes (`$state`, `$derived`, `$props`) — not Svelte 4 `export let` / `$:` syntax.
-- Drizzle: <pinned version> — <migration command; sqlite driver used; dialect-specific notes>
-- zod: <pinned version> — <v3 or v4; import path used by `@hono/zod-openapi`>
-- Hono: <pinned version> — <OpenAPI registry pattern; error handler>
+- **TypeScript: 5.9.3 — do not bump.** `latest` is 7.0.2, but `svelte-check` wants `^5||^6`,
+  `@sveltejs/kit` `^5.3.3||^6`, and `openapi-typescript` `^5.x`. 5.9.3 is the only version satisfying all three.
+- **zod: 4.5.4 (v4).** `@hono/zod-openapi` re-exports a `z` decorated with `.openapi()`. Importing bare `zod`
+  alongside it silently drops the OpenAPI metadata — so there is exactly **one** `z`, re-exported from
+  `packages/contracts/src/z.ts`. Import it from there, never from `zod`.
+- **Hono: 4.13.7** + `@hono/zod-openapi` 1.6.3 + `@hono/node-server` 2.1.1 + `@scalar/hono-api-reference` 0.12.0.
+  Each route module owns its own `OpenAPIHono` router and registers its own routes; `apps/api/src/app.ts` mounts
+  all eight and is the only place that changes when a *new* module appears. One `onError` + one `notFound`
+  produce the `{ error: { code, message, details? } }` shape. Spec is emitted with `app.doc31()`.
+- **Drizzle: `drizzle-orm` 0.45.2 / `drizzle-kit` 0.31.10**, `better-sqlite3` 13.0.3 driver. Migrations:
+  `pnpm --filter @pcpi/api db:generate` (writes `apps/api/drizzle/`), applied on API boot. One schema file
+  (`apps/api/src/db/schema.ts`), sqlite dialect now, postgres later. In SQLite a plain unique index already
+  means "unique among non-NULL rows", so §3's `partNumber`/`upc` rules need no partial index.
+- **Svelte 5 runes** (`$state`, `$derived`, `$props`, `{@render}`) — **not** Svelte 4 `export let` / `$:` /
+  `<slot>`. Pins: svelte 5.57.0, `@sveltejs/kit` 2.70.3, adapter-node 5.5.7, vite-plugin-svelte 7.3.0 (requires
+  vite `^8` and svelte `^5.46.4`), vite 8.2.2, svelte-check 4.7.6.
+- **pnpm 11 settings live in `pnpm-workspace.yaml`**, not the `pnpm` key of `package.json` (silently ignored).
+  `allowBuilds`/`onlyBuiltDependencies` list `better-sqlite3`. That package also ships prebuilds for
+  win32/linux/linuxmusl x64+arm64, so no compiler is needed to *run* it — relevant to the container image.
+- **PNG cards: `satori` 0.33.4 + `@resvg/resvg-js` 2.6.2 + `@fontsource/inter` 5.3.0**, in `apps/api` (added by
+  W0.5 — the seed deliberately did not). satori takes a **plain object tree, no JSX**, supports only a small CSS
+  subset (every multi-child element needs an explicit `display: flex`), and accepts **ttf/otf/woff but not woff2**
+  — the two `.woff` faces plus `OFL.txt` are committed under `apps/api/assets/` and loaded once at module scope.
+- **`better-sqlite3` is CJS** (`import Database from 'better-sqlite3'`); `nanoid` and `satori` are ESM-only.
+  Everything here is `"type": "module"`.
+- **The harness must never hard-code a port or DB path** — it binds `PORT=0`, reads the port the child reports
+  on stdout, and uses a fresh `os.tmpdir()` database, because several worktrees run it concurrently.
