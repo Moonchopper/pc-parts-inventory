@@ -63,6 +63,14 @@ hour: an implementer reported a clean netstat and had left a `tsx watch` on :302
 Carry-ins to M1: F14; the 503 page names the internal API URL to visitors (dev-only detail, generic message in prod);
 `40-web` prerender flake (retry the web build once inside the check); container-slim; `PUBLIC_ORIGIN` dev default.
 
+**First CI (2026-09-06, PR #1).** Three runs to green, two findings, both cross-platform and both now structural:
+(1) the Windows runner checked out CRLF (`core.autocrlf=true` default) and Biome reported 129 format errors —
+`.gitattributes` now pins LF on every checkout (R12 was a claim until this run); (2) the first satori/resvg render
+(cold font + wasm) took 5.5 s on windows-latest vs vitest's 5 s default — a 30 s guard on the two render describes
+(learning 7). Ubuntu and the compose build were green on the first try. Harness artifacts upload from both OSes.
+Carry-in: CI's harness runs the 7-component sample; M1 adds a second run on `MOONPC.redacted.json` so real hardware is
+CI evidence too. Actions v4 emit Node 20 deprecation annotations (forced to 24, harmless) — bump to v5 in M1.
+
 **Architect's notes.** The re-cut roles worked as intended on the first try: my context stayed on design and the
 conversation (≈ 20 tool calls all session), the PM absorbed the fan-out and every validation, and no tier accepted
 its own work. The costliest lesson was mine — a plan whose endpoint table and share contract were not reconciled
