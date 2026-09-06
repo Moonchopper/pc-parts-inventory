@@ -1,0 +1,15 @@
+# R12 cross-platform: the repo is LF everywhere, on every checkout, regardless of core.autocrlf.
+# (First CI run: the Windows runner checked out CRLF and Biome reported 129 format errors.)
+* text=auto eol=lf
+
+# Windows scripts stay CRLF-tolerant for PowerShell 5.1 but are stored LF; PS reads both.
+*.ps1 text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary
+*.png binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.db binary
