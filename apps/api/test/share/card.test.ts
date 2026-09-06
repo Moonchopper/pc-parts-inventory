@@ -323,7 +323,10 @@ describe('buildCardTree — D17 Paid/Now render "—" for no data, never $0.00 (
   });
 });
 
-describe('renderCardPng', () => {
+// Real satori + resvg renders: the first one loads the font and the wasm cold, which took 5.5 s on a
+// shared windows-latest runner (first CI run, 2026-09-06) against vitest's 5 s default. A generous
+// sanity guard, not a perf assertion (playbook learning 7): throughput belongs to the harness.
+describe('renderCardPng', { timeout: 30_000 }, () => {
   it('renders a real PNG (magic bytes) over 10000 bytes for the standard fixture', async () => {
     const png = await renderCardPng(
       build({
@@ -427,7 +430,9 @@ describe('renderCardPng', () => {
   });
 });
 
-describe('buildCardTree — never leaks fields SharedBuild does not carry', () => {
+describe('buildCardTree — never leaks fields SharedBuild does not carry', {
+  timeout: 30_000,
+}, () => {
   it('ignores serial/notes/acquiredSource even if a poisoned object smuggles them in', () => {
     const poisonedItem = {
       ...item(),
